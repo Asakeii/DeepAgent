@@ -1,6 +1,5 @@
 package infra
 
-// TODO: Load prompt templates from internal/prompts.
 import (
 	"context"
 	"fmt"
@@ -8,7 +7,8 @@ import (
 	"path/filepath"
 )
 
-// GetPromptTemplate loads a prompt template from internal/prompts/{name}.md.
+// GetPromptTemplate 从 internal/prompts/{name}.md 读取 Agent 的系统提示词。
+// 这样提示词可以独立维护，不需要写死在 Go 代码里。
 func GetPromptTemplate(ctx context.Context, name string) (string, error) {
 	wd, err := os.Getwd()
 	if err != nil {

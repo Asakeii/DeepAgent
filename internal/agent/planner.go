@@ -38,11 +38,24 @@ func loadPlannerMessages(ctx context.Context, state *model.State) ([]*schema.Mes
 		return nil, err
 	}
 
-	promptTemp := prompt.FromMessages(
-		schema.Jinja2,
-		schema.SystemMessage(sysPrompt),
-		schema.MessagesPlaceholder("user_input", true),
-	)
+	var promptTemp *prompt.DefaultChatTemplate
+	if state.EnableBackgroundInvestigation && len(state.BackgroundInvestigationResults) > 0 {
+		promptTemp = prompt.FromMessages(
+			schema.Jinja2,
+			schema.SystemMessage(sysPrompt),
+			schema.MessagesPlaceholder("user_input", true),
+			schema.UserMessage(fmt.Sprintf(
+				"background investigation results of user query: \n %s",
+				state.BackgroundInvestigationResults,
+			)),
+		)
+	} else {
+		promptTemp = prompt.FromMessages(
+			schema.Jinja2,
+			schema.SystemMessage(sysPrompt),
+			schema.MessagesPlaceholder("user_input", true),
+		)
+	}
 
 	messages, err := promptTemp.Format(ctx, map[string]any{
 		"locale":              state.Locale,
@@ -62,17 +75,20 @@ func routePlannerResult(ctx context.Context, state *model.State, input *schema.M
 	state.Goto = compose.END
 	state.CurrentPlan = &model.Plan{}
 
+	// Planner 必须输出 Plan JSON，这是后续 ResearchTeam 调度的结构化契约。
 	if err := json.Unmarshal([]byte(input.Content), state.CurrentPlan); err != nil {
 		return fmt.Errorf("parse planner json: %w\nraw content: %s", err, input.Content)
 	}
 
 	state.PlanIterations++
 
+	// 如果 Planner 判断上下文已经足够，就直接进入 Reporter。
 	if state.CurrentPlan.HasEnoughContext {
 		state.Goto = consts.Reporter
 		return nil
 	}
 
+	// 否则先进入 Human Feedback。当前 console 模式下 AutoAcceptedPlan=true，会自动继续到 ResearchTeam。
 	state.Goto = consts.Human
 	return nil
 }

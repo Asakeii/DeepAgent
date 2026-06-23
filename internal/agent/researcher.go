@@ -3,10 +3,14 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	einomcp "github.com/cloudwego/eino-ext/components/tool/mcp"
 	"github.com/cloudwego/eino/components/prompt"
+	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
+	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
 
 	"deepAgent/internal/consts"
@@ -55,6 +59,7 @@ func loadResearcherMessages(ctx context.Context, state *model.State) ([]*schema.
 			curStep.Description,
 			state.Locale,
 		)),
+		schema.SystemMessage("IMPORTANT: DO NOT include inline citations in the text. Instead, track all sources and include a References section at the end using link reference format. Include an empty line between each citation for better readability. Use this format for each reference:\n- [Source Title](URL)\n\n- [Another Source](URL)"),
 	}
 
 	msgs, err := promptTemp.Format(ctx, map[string]any{
@@ -71,17 +76,21 @@ func loadResearcherMessages(ctx context.Context, state *model.State) ([]*schema.
 	return msgs, nil
 }
 
+// routeResearcherResult 把 Researcher 的最终输出写回当前未完成 Step。
+// 写完后回到 ResearchTeam，由 ResearchTeam 决定继续执行下一个 Step 还是进入 Reporter。
 func routeResearcherResult(ctx context.Context, state *model.State, input *schema.Message) error {
 	_, idx, err := findCurrentStep(state)
 	if err != nil {
 		return err
 	}
 
-	state.CurrentPlan.Steps[idx].ExecutionRes = &input.Content
+	result := strings.Clone(input.Content)
+	state.CurrentPlan.Steps[idx].ExecutionRes = &result
 	state.Goto = consts.ResearchTeam
 	return nil
 }
 
+// loadResearcherMsg 是 Researcher 子图的 load 节点。
 func loadResearcherMsg(ctx context.Context, input string, opts ...any) (output []*schema.Message, err error) {
 	err = compose.ProcessState[*model.State](ctx, func(ctx context.Context, state *model.State) error {
 		output, err = loadResearcherMessages(ctx, state)
@@ -90,6 +99,7 @@ func loadResearcherMsg(ctx context.Context, input string, opts ...any) (output [
 	return output, err
 }
 
+// routerResearcher 是 Researcher 子图的 router 节点。
 func routerResearcher(ctx context.Context, input *schema.Message, opts ...any) (output string, err error) {
 	err = compose.ProcessState[*model.State](ctx, func(ctx context.Context, state *model.State) error {
 		if err := routeResearcherResult(ctx, state, input); err != nil {
@@ -101,13 +111,62 @@ func routerResearcher(ctx context.Context, input *schema.Message, opts ...any) (
 	return output, err
 }
 
-// NewResearcher 构造与 deer-go 对齐的 Researcher 子图。
-// 当前版本先使用 ChatModel 直接生成；后续会把 agent 节点升级为 ReAct + MCP tools。
+// modifyResearcherInput 在 ReAct 多轮调用前裁剪过长消息。
+// 工具结果可能很长，裁剪尾部能保留最近上下文并降低模型上下文溢出风险。
+func modifyResearcherInput(ctx context.Context, input []*schema.Message) []*schema.Message {
+	maxLimit := 50000
+
+	for i := range input {
+		if input[i] == nil {
+			continue
+		}
+
+		l := len(input[i].Content)
+		if l > maxLimit {
+			input[i].Content = input[i].Content[l-maxLimit:]
+		}
+	}
+
+	return input
+}
+
+// NewResearcher 构造 Researcher 子图，与 deer-go 对齐为 load -> ReAct agent -> router。
+// Researcher 会挂载当前已初始化的所有 MCP tools，用于搜索、抓取或其他外部信息收集。
 func NewResearcher[I, O any](ctx context.Context) *compose.Graph[I, O] {
 	g := compose.NewGraph[I, O]()
 
+	researchTools := []tool.BaseTool{}
+
+	// Researcher 使用全部 MCP server 暴露的工具；Coder 则只使用 python 开头的工具。
+	for _, cli := range infra.MCPServer {
+		ts, err := einomcp.GetTools(ctx, &einomcp.Config{Cli: cli})
+		if err != nil {
+			continue
+		}
+
+		researchTools = append(researchTools, ts...)
+	}
+
+	// ReAct Agent 会在“模型思考 -> 工具调用 -> 观察结果”之间循环，直到得到最终回答或达到 MaxStep。
+	agent, err := react.NewAgent(ctx, &react.AgentConfig{
+		MaxStep:               40,
+		ToolCallingModel:      infra.ChatModel,
+		ToolsConfig:           compose.ToolsNodeConfig{Tools: researchTools},
+		MessageModifier:       modifyResearcherInput,
+		StreamToolCallChecker: toolCallChecker,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	// AnyLambda 把 ReAct Agent 的 Generate/Stream 能力包装成 Eino Graph 节点。
+	agentLambda, err := compose.AnyLambda(agent.Generate, agent.Stream, nil, nil)
+	if err != nil {
+		panic(err)
+	}
+
 	_ = g.AddLambdaNode("load", compose.InvokableLambdaWithOption(loadResearcherMsg))
-	_ = g.AddChatModelNode("agent", infra.ChatModel)
+	_ = g.AddLambdaNode("agent", agentLambda)
 	_ = g.AddLambdaNode("router", compose.InvokableLambdaWithOption(routerResearcher))
 
 	_ = g.AddEdge(compose.START, "load")

@@ -9,8 +9,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config describes the YAML configuration shape for deepAgent.
-// TODO: Implement YAML loading from conf/deep-agent.yaml.
+// Config 对应 conf/deep-agent.yaml 的整体结构。
+// 配置分为 MCP 服务、模型服务和运行参数三部分。
 type Config struct {
 	MCP     MCPConfig     `yaml:"mcp"`
 	Model   ModelConfig   `yaml:"model"`
@@ -21,21 +21,26 @@ type MCPConfig struct {
 	Servers map[string]MCPServerConfig `yaml:"servers"`
 }
 
+// MCPServerConfig 描述一个 stdio MCP server 的启动方式。
+// 例如 python server 会通过 command=uv + args 启动。
 type MCPServerConfig struct {
 	Command string            `yaml:"command"`
 	Args    []string          `yaml:"args"`
 	Env     map[string]string `yaml:"env,omitempty"`
 }
 
+// ModelConfig 描述 OpenAI-compatible chat completion 服务配置。
 type ModelConfig struct {
 	DefaultModel string `yaml:"default_model"`
 	APIKey       string `yaml:"api_key"`
 	BaseURL      string `yaml:"base_url"`
 }
 
+// SettingConfig 是 Agent 工作流运行时参数。
 type SettingConfig struct {
-	MaxPlanIterations int `yaml:"max_plan_iterations"`
-	MaxStepNum        int `yaml:"max_step_num"`
+	MaxPlanIterations             int  `yaml:"max_plan_iterations"`
+	MaxStepNum                    int  `yaml:"max_step_num"`
+	EnableBackgroundInvestigation bool `yaml:"enable_background_investigation"`
 }
 
 var App *Config // 全局配置变量，保存加载后的配置

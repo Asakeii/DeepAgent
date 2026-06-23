@@ -81,6 +81,7 @@ func loadReporterMessages(ctx context.Context, state *model.State) ([]*schema.Me
 }
 
 func routeReporterResult(ctx context.Context, state *model.State, input *schema.Message) (string, error) {
+	// Reporter 是当前任务的终点：写 END 后，总图不再继续路由。
 	state.Goto = compose.END
 	return strings.TrimSpace(input.Content), nil
 }

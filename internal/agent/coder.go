@@ -86,7 +86,9 @@ func routeCoderResult(ctx context.Context, state *model.State, input *schema.Mes
 		return err
 	}
 
-	state.CurrentPlan.Steps[idx].ExecutionRes = &input.Content
+	// 复制一份字符串再存入 State，避免直接持有 Message 字段地址。
+	result := strings.Clone(input.Content)
+	state.CurrentPlan.Steps[idx].ExecutionRes = &result
 	state.Goto = consts.ResearchTeam
 	return nil
 }
