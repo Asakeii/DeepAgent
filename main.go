@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
 	"deepAgent/conf"
@@ -32,6 +33,11 @@ func main() {
 	}
 	if err := infra.InitMCP(ctx); err != nil {
 		log.Fatal(err)
+	}
+	if os.Getenv("DEEPAGENT_DEBUG_MCP") == "true" {
+		if err := infra.LogMCPTools(ctx); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	if os.Getenv("DEEPAGENT_MODE") == "server" {
@@ -67,15 +73,27 @@ func runCLI(cfg *conf.Config) {
 		log.Fatal(err)
 	}
 
-	report, err := r.Invoke(context.Background(), consts.Coordinator)
+	// 与 deer-go runConsole 对齐：用 Stream 而非 Invoke。
+	// 图里的 chat model 节点走流式实现，Coordinator 在 tool call（hand_to_planner）后
+	// 不会以字符串形式结束，Invoke 会死等最终输出；Stream 经 callbacks 推送事件才不会卡。
+	outChan := make(chan string)
+	go func() {
+		for out := range outChan {
+			fmt.Print(out)
+		}
+	}()
+
+	_, err = r.Stream(context.Background(), consts.Coordinator,
+		compose.WithCallbacks(&infra.LoggerCallback{
+			ID:  "console",
+			Out: outChan,
+		}),
+	)
+	close(outChan)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	fmt.Println()
-	fmt.Println("========== FINAL REPORT ==========")
-	fmt.Println()
-	fmt.Println(report)
 }
 
 func runServer() {

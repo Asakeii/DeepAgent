@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/eino/components/prompt"
@@ -76,8 +78,19 @@ func routePlannerResult(ctx context.Context, state *model.State, input *schema.M
 	state.CurrentPlan = &model.Plan{}
 
 	// Planner 必须输出 Plan JSON，这是后续 ResearchTeam 调度的结构化契约。
-	if err := json.Unmarshal([]byte(input.Content), state.CurrentPlan); err != nil {
-		return fmt.Errorf("parse planner json: %w\nraw content: %s", err, input.Content)
+	// 但模型偶尔会把 JSON 包在 ```json ... ``` 里或前后带多余文字，
+	// 直接 Unmarshal 失败就 return error 会让整张图崩溃退出。
+	// 这里对齐 deer-go 的容错语义：解析失败不致命。
+	if err := json.Unmarshal([]byte(extractPlanJSON(input.Content)), state.CurrentPlan); err != nil {
+		log.Printf("[planner] parse plan json failed: %v, raw content: %q", err, input.Content)
+		// 已经迭代过至少一次：降级到 Reporter，用已有结果兜底出报告。
+		if state.PlanIterations > 0 {
+			state.Goto = consts.Reporter
+			return nil
+		}
+		// 从未成功生成过计划：直接结束，避免无计划死循环。
+		state.Goto = compose.END
+		return nil
 	}
 
 	state.PlanIterations++
@@ -91,6 +104,25 @@ func routePlannerResult(ctx context.Context, state *model.State, input *schema.M
 	// 否则先进入 Human Feedback。当前 console 模式下 AutoAcceptedPlan=true，会自动继续到 ResearchTeam。
 	state.Goto = consts.Human
 	return nil
+}
+
+// extractPlanJSON 从模型输出里提取 Plan JSON 文本。
+// 优先取 ```json ... ``` 包裹的内容；没有 code fence 就按原文返回，交给 json.Unmarshal 决定成败。
+func extractPlanJSON(content string) string {
+	s := strings.TrimSpace(content)
+
+	// 去掉开头的 ```json 或 ```
+	if strings.HasPrefix(s, "```") {
+		// 去掉首行 fence 标记
+		if nl := strings.IndexByte(s, '\n'); nl > 0 {
+			s = strings.TrimSpace(s[nl+1:])
+		}
+		// 去掉结尾的 ```
+		if idx := strings.LastIndex(s, "```"); idx >= 0 {
+			s = strings.TrimSpace(s[:idx])
+		}
+	}
+	return s
 }
 
 // loadPlannerMsg 是 Planner 子图里的 load 节点。
