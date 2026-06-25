@@ -37,7 +37,8 @@ services:
       # 打印已加载 MCP 工具，便于在日志里确认 python/tavily 工具数
       DEEPAGENT_DEBUG_MCP: "true"
     ports:
-      - "8080:8080"
+      # 宿主 8088 → 容器内 8080（避开本机 8080 被其他服务占用）
+      - "8088:8080"
     volumes:
       # 真实配置（含 key、容器内 DSN）通过 volume 注入，不烤进镜像
       - ../conf/deep-agent.yaml:/app/conf/deep-agent.yaml:ro
