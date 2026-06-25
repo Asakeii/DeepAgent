@@ -17,6 +17,11 @@ mcp:
         - "/Users/gd-npc-1029/Documents/CodeBase/deepAgent/mcps/python"
         - "run"
         - "server.py"
+    remote-search:
+      url: "http://localhost:3000/sse"
+      headers:
+        - "Authorization: Bearer <your token>"
+      # Set DEEPAGENT_DEBUG_MCP=true before startup to print loaded tools.
 
 model:
   default_model: "<your model>"

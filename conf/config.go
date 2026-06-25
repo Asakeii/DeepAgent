@@ -21,12 +21,14 @@ type MCPConfig struct {
 	Servers map[string]MCPServerConfig `yaml:"servers"`
 }
 
-// MCPServerConfig 描述一个 stdio MCP server 的启动方式。
-// 例如 python server 会通过 command=uv + args 启动。
+// MCPServerConfig 描述一个 MCP server 的启动方式。
+// command/args/env 对应 stdio MCP；url/headers 对应 SSE MCP。
 type MCPServerConfig struct {
 	Command string            `yaml:"command"`
 	Args    []string          `yaml:"args"`
 	Env     map[string]string `yaml:"env,omitempty"`
+	URL     string            `yaml:"url,omitempty"`
+	Headers []string          `yaml:"headers,omitempty"`
 }
 
 // ModelConfig 描述 OpenAI-compatible chat completion 服务配置。
