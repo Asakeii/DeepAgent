@@ -72,5 +72,10 @@ func Builder(ctx context.Context, genFunc compose.GenLocalState[*model.State]) (
 
 	_ = g.AddEdge(compose.START, consts.Coordinator)
 
-	return g.Compile(ctx, compose.WithGraphName("DeepAgent"))
+	return g.Compile(
+		ctx,
+		compose.WithGraphName("DeepAgent"),
+		compose.WithNodeTriggerMode(compose.AnyPredecessor),
+		compose.WithCheckPointStore(model.NewDeepAgentCheckPoint(ctx)),
+	)
 }
