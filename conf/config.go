@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	_ "github.com/go-sql-driver/mysql" // 注册 MySQL 驱动，供 sql.Open 时使用（Task 2 InitDB）
 	"gopkg.in/yaml.v3"
 )
 
