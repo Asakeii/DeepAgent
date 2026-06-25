@@ -12,9 +12,17 @@ import (
 // Config 对应 conf/deep-agent.yaml 的整体结构。
 // 配置分为 MCP 服务、模型服务和运行参数三部分。
 type Config struct {
-	MCP     MCPConfig     `yaml:"mcp"`
-	Model   ModelConfig   `yaml:"model"`
-	Setting SettingConfig `yaml:"setting"`
+	MCP      MCPConfig      `yaml:"mcp"`
+	Model    ModelConfig    `yaml:"model"`
+	Setting  SettingConfig  `yaml:"setting"`
+	Database DatabaseConfig `yaml:"database"`
+}
+
+// DatabaseConfig 描述 MySQL 连接配置。
+// DSN 形如 "user:pass@tcp(host:3306)/db?parseTime=true"。
+// 本阶段 DSN 允许为空，连接校验留待 InitDB（Task 2）执行。
+type DatabaseConfig struct {
+	DSN string `yaml:"dsn"`
 }
 
 type MCPConfig struct {
@@ -32,10 +40,12 @@ type MCPServerConfig struct {
 }
 
 // ModelConfig 描述 OpenAI-compatible chat completion 服务配置。
+// VisionModel 为识图 agent 专用模型，未配置时为 nil，后续识图阶段回退主讲模型。
 type ModelConfig struct {
-	DefaultModel string `yaml:"default_model"`
-	APIKey       string `yaml:"api_key"`
-	BaseURL      string `yaml:"base_url"`
+	DefaultModel string       `yaml:"default_model"`
+	APIKey       string       `yaml:"api_key"`
+	BaseURL      string       `yaml:"base_url"`
+	VisionModel  *ModelConfig `yaml:"vision_model,omitempty"`
 }
 
 // SettingConfig 是 Agent 工作流运行时参数。

@@ -1,0 +1,47 @@
+# 一键起 MySQL + deepAgent 的 compose 定义。
+# 所有相对路径以本文件所在目录（deploy/）为基准。
+#   - mysql:8 初始化时把 internal/store/schema.sql 挂进 /docker-entrypoint-initdb.d 自动建表
+#   - deepagent: 本地 Dockerfile 构建；depends_on 等 mysql 健康后再起；配置走 volume 挂载
+#
+# 用法：
+#   docker compose -f deploy/docker-compose.yml up -d --build
+services:
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: deepagent
+      MYSQL_DATABASE: deepagent
+    ports:
+      - "3306:3306"
+    volumes:
+      # 首次启动时自动执行建表 SQL（mysql:8 镜像会按文件名顺序跑 /docker-entrypoint-initdb.d/*.sql）
+      - ../internal/store/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      # mysqladmin ping 返回 mysqld is alive 即视为健康
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pdeepagent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  deepagent:
+    build:
+      # context 为项目根，Dockerfile 需从根拷 go.mod / mcps / internal 等
+      context: ..
+      dockerfile: deploy/Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DEEPAGENT_MODE: server
+      # 打印已加载 MCP 工具，便于在日志里确认 python/tavily 工具数
+      DEEPAGENT_DEBUG_MCP: "true"
+    ports:
+      # 宿主 8088 → 容器内 8080（避开本机 8080 被其他服务占用）
+      - "8088:8080"
+    volumes:
+      # 真实配置（含 key、容器内 DSN）通过 volume 注入，不烤进镜像
+      - ../conf/deep-agent.yaml:/app/conf/deep-agent.yaml:ro
+
+volumes:
+  mysql-data:

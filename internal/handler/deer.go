@@ -110,6 +110,23 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 	for {
 		msg, recvErr := out.Recv()
 		if recvErr != nil {
+			// 流式中断：Human Feedback 在流中途以 sentinel error 形式出现，
+			// 此时 runnable.Stream 本身不返回 error（err==nil），而是在 Recv 时收到 interrupt。
+			// 必须在此处用 ExtractInterruptInfo 识别，否则会被当成普通流错误返回 event:error。
+			if _, ok := compose.ExtractInterruptInfo(recvErr); ok {
+				_ = sse.WriteEvent("interrupt", &model.ChatResp{
+					ThreadID:     req.ThreadID,
+					ID:           "human_feedback",
+					Role:         "assistant",
+					Content:      "检查计划",
+					FinishReason: "interrupt",
+					Options: []map[string]any{
+						{"text": "编辑计划", "value": "edit_plan"},
+						{"text": "开始执行", "value": "accepted"},
+					},
+				})
+				return
+			}
 			if recvErr != io.EOF {
 				_ = sse.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "stream failed: " + recvErr.Error()})
 			}

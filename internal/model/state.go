@@ -2,10 +2,13 @@ package model
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
+
+	"deepAgent/internal/store"
 )
 
 func init() {
@@ -58,26 +61,14 @@ func (s *State) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// DeepAgentCheckPoint 是 Graph 的内存 checkpoint 存储。
-// Eino 会用 checkPointID 保存/读取中断时的 Graph 现场；后续服务化时通常使用 thread_id 作为 checkPointID。
-type DeepAgentCheckPoint struct {
-	buf map[string][]byte
-}
-
-func (cp *DeepAgentCheckPoint) Get(ctx context.Context, checkPointID string) ([]byte, bool, error) {
-	data, ok := cp.buf[checkPointID]
-	return data, ok, nil
-}
-
-func (cp *DeepAgentCheckPoint) Set(ctx context.Context, checkPointID string, checkPoint []byte) error {
-	cp.buf[checkPointID] = checkPoint
-	return nil
-}
-
-var deepAgentCheckPoint = DeepAgentCheckPoint{
-	buf: make(map[string][]byte),
-}
-
-func NewDeepAgentCheckPoint(ctx context.Context) compose.CheckPointStore {
-	return &deepAgentCheckPoint
+// NewDeepAgentCheckPoint 构造一个基于 MySQL 的无状态 CheckPointStore。
+// Eino 会用 checkPointID 保存/读取中断时的 Graph 现场；服务化时通常使用 thread_id 作为 checkPointID。
+//
+// 这里通过依赖注入接收 *sql.DB，而不是在 model 包内直接读取 infra.DB：
+// infra 包（llm.go/logger.go）已经 import internal/model，若 model 再 import infra，
+// 会形成 model → infra → model 循环依赖。改为由调用方（agent/builder.go，已同时 import
+// model 和 infra）把 infra.DB 显式传入，import 方向保持单向 infra → model / model → store，
+// 无环。同时这也更符合无状态/可测试原则。
+func NewDeepAgentCheckPoint(ctx context.Context, db *sql.DB) compose.CheckPointStore {
+	return store.NewMySQLCheckPoint(db)
 }

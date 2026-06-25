@@ -27,8 +27,16 @@ model:
   default_model: "<your model>"
   api_key: "<your api key>"
   base_url: "<your base url>"
+  vision_model:              # 识图 agent 专用，初值复用上方；缺失回退主模型
+    default_model: "<your vision model>"
+    api_key: "<your api key>"
+    base_url: "<your base url>"
 
 setting:
   max_plan_iterations: 1
   max_step_num: 3
   enable_background_investigation: false
+
+database:
+  dsn: "root:deepagent@tcp(mysql:3306)/deepagent?parseTime=true"
+

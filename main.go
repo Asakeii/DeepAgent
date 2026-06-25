@@ -28,6 +28,9 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if err := infra.InitDB(ctx); err != nil {
+		log.Fatal(err)
+	}
 	if err := infra.InitModel(ctx); err != nil {
 		log.Fatal(err)
 	}
