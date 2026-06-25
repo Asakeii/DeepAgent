@@ -7,9 +7,12 @@ require (
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.17
 	github.com/eino-contrib/jsonschema v1.0.3
+	github.com/go-sql-driver/mysql v1.10.0
 	github.com/mark3labs/mcp-go v0.54.1
 	gopkg.in/yaml.v3 v3.0.1
 )
+
+require filippo.io/edwards25519 v1.2.0 // indirect
 
 require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
@@ -27,7 +30,6 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/meguminnnnnnnnn/go-openai v0.1.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
