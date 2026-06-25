@@ -6,6 +6,7 @@ import (
 	"github.com/cloudwego/eino/compose"
 
 	"deepAgent/internal/consts"
+	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
 )
 
@@ -76,6 +77,6 @@ func Builder(ctx context.Context, genFunc compose.GenLocalState[*model.State]) (
 		ctx,
 		compose.WithGraphName("DeepAgent"),
 		compose.WithNodeTriggerMode(compose.AnyPredecessor),
-		compose.WithCheckPointStore(model.NewDeepAgentCheckPoint(ctx)),
+		compose.WithCheckPointStore(model.NewDeepAgentCheckPoint(ctx, infra.DB)),
 	)
 }
