@@ -1,0 +1,8 @@
+# deepAgent Docker build context 排除清单
+# （build context = 项目根，docker-compose.yml 里 context: ..）
+.git
+.gitignore
+.venv
+output
+*.log
+conf/deep-agent.yaml
