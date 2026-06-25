@@ -25,7 +25,11 @@ func RunHumanFeedback(ctx context.Context, state *model.State) error {
 	case consts.EditPlan:
 		state.Goto = consts.Planner
 	default:
-		return compose.InterruptAndRerun
+		// v0.9.7 标准中断 API：会自动带上 execution address、生成 InterruptSignal，
+		// 框架据此存 checkpoint 并可被 handler 的 ExtractInterruptInfo 识别。
+		// 旧版 compose.InterruptAndRerun 是 deprecated 裸 sentinel，不会被框架包装，
+		// 导致既不存 checkpoint、handler 也识别不到（端到端验证暴露）。
+		return compose.Interrupt(ctx, nil)
 	}
 
 	state.InterruptFeedback = ""
