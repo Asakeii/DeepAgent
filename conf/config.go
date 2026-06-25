@@ -13,9 +13,9 @@ import (
 // Config 对应 conf/deep-agent.yaml 的整体结构。
 // 配置分为 MCP 服务、模型服务和运行参数三部分。
 type Config struct {
-	MCP      MCPConfig     `yaml:"mcp"`
-	Model    ModelConfig   `yaml:"model"`
-	Setting  SettingConfig `yaml:"setting"`
+	MCP      MCPConfig      `yaml:"mcp"`
+	Model    ModelConfig    `yaml:"model"`
+	Setting  SettingConfig  `yaml:"setting"`
 	Database DatabaseConfig `yaml:"database"`
 }
 
