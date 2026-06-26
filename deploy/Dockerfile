@@ -56,6 +56,8 @@ WORKDIR /app
 # 拷 Go 二进制与运行时需要的静态资源。
 # 注意：conf/deep-agent.yaml 通过 docker-compose volume 挂载注入（含真实 key，不进镜像）。
 COPY --from=builder /out/deep-agent /app/deep-agent
+COPY internal/agent/ /app/internal/agent/
+COPY internal/tool/ /app/internal/tool/
 COPY internal/prompts/ /app/internal/prompts/
 COPY internal/store/schema.sql /app/internal/store/schema.sql
 

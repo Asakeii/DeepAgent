@@ -43,6 +43,11 @@ func main() {
 		}
 	}
 
+	if os.Getenv("DEEPAGENT_MODE") == "checkin" {
+		runCheckin(cfg)
+		return
+	}
+
 	if os.Getenv("DEEPAGENT_MODE") == "server" {
 		runServer()
 		return
@@ -97,6 +102,64 @@ func runCLI(cfg *conf.Config) {
 		log.Fatal(err)
 	}
 	fmt.Println()
+}
+
+func runCheckin(cfg *conf.Config) {
+	ctx := context.Background()
+
+	agent, err := agent.NewCheckinAgent(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// thread_id：用环境变量传入，或用一个默认固定值（单用户 console）。
+	// 无状态：每次调用从 messages 表加载历史、调用后 append。
+	threadID := os.Getenv("DEEPAGENT_THREAD_ID")
+	if threadID == "" {
+		threadID = "console-default"
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Print("\n你： ")
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return
+		}
+		userInput := strings.TrimSpace(line)
+		if userInput == "" {
+			continue
+		}
+		if userInput == "exit" || userInput == "quit" {
+			return
+		}
+
+		// 加载历史 + 拼当前消息
+		history, err := infra.RecentMessagesForCheckin(ctx, threadID, 20)
+		if err != nil {
+			log.Printf("load history: %v", err)
+		}
+		msgs := append(history, schema.UserMessage(userInput))
+
+		// 记录用户消息（append 到 messages 表）
+		if err := infra.AppendMessageForCheckin(ctx, threadID, string(schema.User), userInput); err != nil {
+			log.Printf("append user msg: %v", err)
+		}
+
+		// 直接调 ReAct agent（不走图）
+		resp, err := agent.Generate(ctx, msgs)
+		if err != nil {
+			log.Printf("agent error: %v", err)
+			continue
+		}
+
+		// 记录助手回复
+		if err := infra.AppendMessageForCheckin(ctx, threadID, string(schema.Assistant), resp.Content); err != nil {
+			log.Printf("append assistant msg: %v", err)
+		}
+
+		fmt.Printf("教练：%s\n", resp.Content)
+	}
 }
 
 func runServer() {
