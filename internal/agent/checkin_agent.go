@@ -14,9 +14,9 @@ import (
 
 // NewCheckinAgent 构造一个独立的 ReAct checkin agent（不入总图，直接 agent.Generate 调用）。
 // agent 使用 infra.ChatModel + 打卡工具集；MessageModifier 在调用前注入 system prompt。
-// 历史消息由调用方（runCheckin）传入 []*schema.Message，这里 MessageModifier 只补 system prompt。
-func NewCheckinAgent(ctx context.Context) (*react.Agent, error) {
-	tools, err := tool.CheckinTools(ctx, infra.DB, infra.VisionModel)
+// threadID 用于工具闭包内强制绑定当前会话，避免模型瞎编 thread_id。
+func NewCheckinAgent(ctx context.Context, threadID string) (*react.Agent, error) {
+	tools, err := tool.CheckinTools(ctx, infra.DB, infra.VisionModel, threadID)
 	if err != nil {
 		return nil, fmt.Errorf("build checkin tools: %w", err)
 	}
