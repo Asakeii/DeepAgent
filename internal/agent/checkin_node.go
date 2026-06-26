@@ -91,16 +91,16 @@ func NewCheckinNode[I, O any](ctx context.Context) *compose.Graph[I, O] {
 		return g
 	}
 
+	// 用 AnyLambda（与 researcher.go 同样套路）：同时支持 Generate/Stream，
+	// 让 Pregel 运行时走流式路径，使 LoggerCallback.OnEndWithStreamOutput 正常触发 SSE 事件。
+	agentLambda, err := compose.AnyLambda(checkinAgent.Generate, checkinAgent.Stream, nil, nil)
+	if err != nil {
+		fmt.Printf("WARNING: AnyLambda failed: %v\n", err)
+		return g
+	}
+
 	_ = g.AddLambdaNode("load", compose.InvokableLambdaWithOption(loadCheckinMsg))
-	_ = g.AddLambdaNode("agent", compose.InvokableLambdaWithOption(
-		func(ctx context.Context, msgs []*schema.Message, opts ...any) (*schema.Message, error) {
-			resp, err := checkinAgent.Generate(ctx, msgs)
-			if err != nil {
-				return nil, fmt.Errorf("checkin agent: %w", err)
-			}
-			return resp, nil
-		},
-	))
+	_ = g.AddLambdaNode("agent", agentLambda)
 	_ = g.AddLambdaNode("router", compose.InvokableLambdaWithOption(routerCheckin))
 
 	_ = g.AddEdge(compose.START, "load")
