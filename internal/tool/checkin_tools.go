@@ -207,5 +207,29 @@ func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel) 
 	}
 	tools = append(tools, af)
 
+	cr, err := utils.InferTool("create_reminder",
+		"创建一个定时提醒（每天/每周提醒等），用户说'每天8点提醒我喝水'时调用",
+		makeCreateReminder(db))
+	if err != nil {
+		return nil, fmt.Errorf("infer create_reminder: %w", err)
+	}
+	tools = append(tools, cr)
+
+	lr, err := utils.InferTool("list_reminders",
+		"列出用户当前的所有提醒",
+		makeListReminders(db))
+	if err != nil {
+		return nil, fmt.Errorf("infer list_reminders: %w", err)
+	}
+	tools = append(tools, lr)
+
+	dr, err := utils.InferTool("delete_reminder",
+		"删除一条提醒（需要提醒的 id，先 list_reminders 获取）",
+		makeDeleteReminder(db))
+	if err != nil {
+		return nil, fmt.Errorf("infer delete_reminder: %w", err)
+	}
+	tools = append(tools, dr)
+
 	return tools, nil
 }

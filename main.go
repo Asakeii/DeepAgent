@@ -18,6 +18,7 @@ import (
 	"deepAgent/internal/handler"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
+	"deepAgent/internal/store"
 	"deepAgent/internal/tool"
 )
 
@@ -32,6 +33,8 @@ func main() {
 	if err := infra.InitDB(ctx); err != nil {
 		log.Fatal(err)
 	}
+	// 启动无状态提醒 ticker（每分钟扫 MySQL 表，抢锁触发到期提醒）
+	_ = store.StartReminderTicker(infra.DB)
 	if err := infra.InitModel(ctx); err != nil {
 		log.Fatal(err)
 	}
