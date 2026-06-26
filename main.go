@@ -18,6 +18,7 @@ import (
 	"deepAgent/internal/handler"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
+	"deepAgent/internal/tool"
 )
 
 func main() {
@@ -43,11 +44,6 @@ func main() {
 		}
 	}
 
-	if os.Getenv("DEEPAGENT_MODE") == "checkin" {
-		runCheckin(cfg)
-		return
-	}
-
 	if os.Getenv("DEEPAGENT_MODE") == "server" {
 		runServer()
 		return
@@ -70,6 +66,7 @@ func runCLI(cfg *conf.Config) {
 		MaxStepNum:                    cfg.Setting.MaxStepNum,
 		AutoAcceptedPlan:              true,
 		EnableBackgroundInvestigation: cfg.Setting.EnableBackgroundInvestigation,
+		ThreadID:                      os.Getenv("DEEPAGENT_THREAD_ID"),
 	}
 
 	genFunc := func(ctx context.Context) *model.State {
@@ -114,7 +111,7 @@ func runCheckin(cfg *conf.Config) {
 		threadID = "console-default"
 	}
 
-	agent, err := agent.NewCheckinAgent(ctx, threadID)
+	agent, err := agent.NewCheckinAgent(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -146,8 +143,9 @@ func runCheckin(cfg *conf.Config) {
 			log.Printf("append user msg: %v", err)
 		}
 
-		// 直接调 ReAct agent（不走图）
-		resp, err := agent.Generate(ctx, msgs)
+		// 注入 threadID 到 context（工具通过 ctx 读取）
+		agentCtx := tool.WithThreadID(ctx, threadID)
+		resp, err := agent.Generate(agentCtx, msgs)
 		if err != nil {
 			log.Printf("agent error: %v", err)
 			continue

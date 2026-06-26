@@ -50,7 +50,12 @@ func (sw *SSEWriter) WriteEvent(event string, payload any) error {
 		return err
 	}
 	if f, ok := sw.w.(http.Flusher); ok {
-		f.Flush()
+		// Flush 在客户端断开连接后可能 panic（bufio.Writer 变 nil）。
+		// recover 兜底，让 callback goroutine 不崩。
+		func() {
+			defer func() { recover() }()
+			f.Flush()
+		}()
 	}
 
 	return nil

@@ -11,6 +11,23 @@ import (
 	"github.com/cloudwego/eino/components/tool/utils"
 )
 
+// ctxKeyThreadID is the context key for the current session's thread ID.
+type ctxKeyThreadID struct{}
+
+// WithThreadID returns a child context with the thread ID set.
+// Callers inject this before calling agent.Generate.
+func WithThreadID(ctx context.Context, threadID string) context.Context {
+	return context.WithValue(ctx, ctxKeyThreadID{}, threadID)
+}
+
+// ThreadIDFromCtx returns the thread ID from context, or "" if not set.
+func ThreadIDFromCtx(ctx context.Context) string {
+	if v, ok := ctx.Value(ctxKeyThreadID{}).(string); ok {
+		return v
+	}
+	return ""
+}
+
 // checkinInput 是 record_checkin 工具的入参。
 // InferTool 会从 struct tag 自动推导参数 JSON schema。
 type checkinInput struct {
@@ -133,16 +150,17 @@ func joinStrings(ss []string, sep string) string {
 	return r
 }
 
-// CheckinTools 返回 checkin agent 使用的全部工具（tool.BaseTool 切片，可直接注入 react.AgentConfig.ToolsConfig）。
-// db 由调用方注入（infra.DB），visionModel 为多模态视觉模型（infra.VisionModel），保持无状态与可测试。
-// threadID 由调用方传入（当前会话的 thread），闭包内强制覆盖，避免模型瞎编 thread_id。
-func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel, threadID string) ([]tool.BaseTool, error) {
+// CheckinTools 返回 checkin agent 使用的全部工具。
+// db 和 visionModel 由调用方注入；threadID 通过 context.WithValue(ctxKeyThreadID{}, tid) 在调用时传入。
+func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel) ([]tool.BaseTool, error) {
 	var tools []tool.BaseTool
 
 	rc, err := utils.InferTool("record_checkin",
 		"记录一条用户打卡（学习/运动/饮食等）",
 		func(ctx context.Context, in checkinInput) (checkinOutput, error) {
-			in.ThreadID = threadID // 强制使用当前会话 thread
+			if tid := ThreadIDFromCtx(ctx); tid != "" {
+				in.ThreadID = tid
+			}
 			return recordCheckin(ctx, in, db)
 		})
 	if err != nil {
@@ -153,7 +171,9 @@ func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel, 
 	qc, err := utils.InferTool("query_checkin",
 		"查询用户历史打卡记录",
 		func(ctx context.Context, in queryCheckinInput) (queryCheckinOutput, error) {
-			in.ThreadID = threadID
+			if tid := ThreadIDFromCtx(ctx); tid != "" {
+				in.ThreadID = tid
+			}
 			return queryCheckin(ctx, in, db)
 		})
 	if err != nil {
@@ -164,7 +184,9 @@ func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel, 
 	gs, err := utils.InferTool("get_summary",
 		"汇总用户最近若干天的打卡情况",
 		func(ctx context.Context, in summaryInput) (summaryOutput, error) {
-			in.ThreadID = threadID
+			if tid := ThreadIDFromCtx(ctx); tid != "" {
+				in.ThreadID = tid
+			}
 			return getSummary(ctx, in, db)
 		})
 	if err != nil {
@@ -175,7 +197,9 @@ func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel, 
 	af, err := utils.InferTool("analyze_food",
 		"分析食物图片，识别所有食物的名称、份量和热量，并自动记录到打卡。用户发食物照片时调用此工具。",
 		func(ctx context.Context, in analyzeInput) (analyzeResult, error) {
-			in.ThreadID = threadID
+			if tid := ThreadIDFromCtx(ctx); tid != "" {
+				in.ThreadID = tid
+			}
 			return analyzeFood(ctx, in, db, visionModel)
 		})
 	if err != nil {
