@@ -3,13 +3,13 @@ package agent
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
+	"deepAgent/internal/tool"
 )
 
 // loadCheckinMsg 是 Checkin 子图的 load 节点。
@@ -24,7 +24,7 @@ func loadCheckinMsg(ctx context.Context, input string, opts ...any) (output []*s
 		// 加载历史消息（跨会话记忆）
 		history, histErr := infra.RecentMessagesForCheckin(ctx, threadID, 20)
 		if histErr != nil {
-			history = nil // 历史加载失败不阻断
+			history = nil
 		}
 
 		// 取用户最新的那条 user message
@@ -36,30 +36,21 @@ func loadCheckinMsg(ctx context.Context, input string, opts ...any) (output []*s
 			}
 		}
 
-		// 拼接：历史 + 当前用户消息
 		output = append(history, schema.UserMessage(userMsg))
-
-		// 记录用户消息到 messages 表
 		_ = infra.AppendMessageForCheckin(ctx, threadID, string(schema.User), userMsg)
-
 		return nil
 	})
 	return output, err
 }
 
 // routerCheckin 是 Checkin 子图的 router 节点。
-// checkin 完成后记录 assistant 回复，然后结束。
 func routerCheckin(ctx context.Context, input *schema.Message, opts ...any) (output string, err error) {
 	err = compose.ProcessState[*model.State](ctx, func(ctx context.Context, state *model.State) error {
 		threadID := state.ThreadID
 		if threadID == "" {
 			threadID = "console-default"
 		}
-
-		// 记录 assistant 回复到 messages 表
 		_ = infra.AppendMessageForCheckin(ctx, threadID, string(schema.Assistant), input.Content)
-
-		// checkin 完成后直接结束
 		state.Goto = compose.END
 		output = compose.END
 		return nil
@@ -67,33 +58,45 @@ func routerCheckin(ctx context.Context, input *schema.Message, opts ...any) (out
 	return output, err
 }
 
-// NewCheckinNode 构造 Checkin 子图：
-//
-//	START -> load -> agent(ReAct) -> router -> END
-//
-// 内部使用独立的 ReAct agent（带打卡工具集），不与研究图共享工具。
+// NewCheckinNode 构造 Checkin 子图：START -> load -> agent(ReAct) -> router -> END
 func NewCheckinNode[I, O any](ctx context.Context) *compose.Graph[I, O] {
 	g := compose.NewGraph[I, O]()
 
-	// threadID 从环境变量取（console 模式）或从 state 中取（图模式由 Coordinator 设置）。
-	// 因为 ReAct agent 构造时需要 threadID 绑定工具闭包，这里先用环境变量兜底，
-	// 图运行时 loadCheckinMsg 会从 state 取真正的 threadID。
-	threadID := os.Getenv("DEEPAGENT_THREAD_ID")
-	if threadID == "" {
-		threadID = "console-default"
-	}
-
-	// 构造 ReAct checkin agent 作为 ChatModel 使用
-	checkinAgent, err := NewCheckinAgent(ctx, threadID)
+	checkinAgent, err := NewCheckinAgent(ctx)
 	if err != nil {
-		// 构造失败不 panic，返回空图
 		fmt.Printf("WARNING: NewCheckinAgent failed: %v\n", err)
 		return g
 	}
 
-	// 用 AnyLambda（与 researcher.go 同样套路）：同时支持 Generate/Stream，
-	// 让 Pregel 运行时走流式路径，使 LoggerCallback.OnEndWithStreamOutput 正常触发 SSE 事件。
-	agentLambda, err := compose.AnyLambda(checkinAgent.Generate, checkinAgent.Stream, nil, nil)
+	// 用 AnyLambda wrapper：从 state.ThreadID 注入 context，让 tools 在运行时
+	// 通过 tool.ThreadIDFromCtx(ctx) 读取正确的 threadID，而非编译时闭包捕获。
+	agentLambda, err := compose.AnyLambda(
+		func(ctx context.Context, msgs []*schema.Message, opts ...any) (*schema.Message, error) {
+			var tid string
+			_ = compose.ProcessState[*model.State](ctx, func(_ context.Context, state *model.State) error {
+				tid = state.ThreadID
+				return nil
+			})
+			agentCtx := ctx
+			if tid != "" {
+				agentCtx = tool.WithThreadID(ctx, tid)
+			}
+			return checkinAgent.Generate(agentCtx, msgs)
+		},
+		func(ctx context.Context, msgs []*schema.Message, opts ...any) (*schema.StreamReader[*schema.Message], error) {
+			var tid string
+			_ = compose.ProcessState[*model.State](ctx, func(_ context.Context, state *model.State) error {
+				tid = state.ThreadID
+				return nil
+			})
+			agentCtx := ctx
+			if tid != "" {
+				agentCtx = tool.WithThreadID(ctx, tid)
+			}
+			return checkinAgent.Stream(agentCtx, msgs)
+		},
+		nil, nil,
+	)
 	if err != nil {
 		fmt.Printf("WARNING: AnyLambda failed: %v\n", err)
 		return g
