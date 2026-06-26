@@ -16,7 +16,7 @@ import (
 // agent 使用 infra.ChatModel + 打卡工具集；MessageModifier 在调用前注入 system prompt。
 // 历史消息由调用方（runCheckin）传入 []*schema.Message，这里 MessageModifier 只补 system prompt。
 func NewCheckinAgent(ctx context.Context) (*react.Agent, error) {
-	tools, err := tool.CheckinTools(ctx, infra.DB)
+	tools, err := tool.CheckinTools(ctx, infra.DB, infra.VisionModel)
 	if err != nil {
 		return nil, fmt.Errorf("build checkin tools: %w", err)
 	}

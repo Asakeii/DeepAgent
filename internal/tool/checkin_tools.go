@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 )
@@ -133,8 +134,8 @@ func joinStrings(ss []string, sep string) string {
 }
 
 // CheckinTools 返回 checkin agent 使用的全部工具（tool.BaseTool 切片，可直接注入 react.AgentConfig.ToolsConfig）。
-// db 由调用方注入（infra.DB），保持无状态与可测试。
-func CheckinTools(ctx context.Context, db *sql.DB) ([]tool.BaseTool, error) {
+// db 由调用方注入（infra.DB），visionModel 为多模态视觉模型（infra.VisionModel），保持无状态与可测试。
+func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel) ([]tool.BaseTool, error) {
 	var tools []tool.BaseTool
 
 	rc, err := utils.InferTool("record_checkin",
@@ -166,6 +167,16 @@ func CheckinTools(ctx context.Context, db *sql.DB) ([]tool.BaseTool, error) {
 		return nil, fmt.Errorf("infer get_summary: %w", err)
 	}
 	tools = append(tools, gs)
+
+	af, err := utils.InferTool("analyze_food",
+		"分析食物图片，识别所有食物的名称、份量和热量，并自动记录到打卡。用户发食物照片时调用此工具。",
+		func(ctx context.Context, in analyzeInput) (analyzeResult, error) {
+			return analyzeFood(ctx, in, db, visionModel)
+		})
+	if err != nil {
+		return nil, fmt.Errorf("infer analyze_food: %w", err)
+	}
+	tools = append(tools, af)
 
 	return tools, nil
 }
