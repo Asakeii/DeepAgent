@@ -48,6 +48,7 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 		MaxStepNum:                    conf.App.Setting.MaxStepNum,
 		AutoAcceptedPlan:              req.AutoAcceptedPlan,
 		EnableBackgroundInvestigation: req.EnableBackgroundInvestigation,
+		ThreadID:                      req.ThreadID,
 	}
 	if req.MaxPlanIterations > 0 {
 		state.MaxPlanIterations = req.MaxPlanIterations

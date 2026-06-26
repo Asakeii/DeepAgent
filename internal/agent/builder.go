@@ -49,6 +49,7 @@ func Builder(ctx context.Context, genFunc compose.GenLocalState[*model.State]) (
 		consts.Coder:                  true,
 		consts.Reporter:               true,
 		consts.BackgroundInvestigator: true,
+		consts.Checkin:                true,
 		compose.END:                   true,
 	}
 
@@ -60,6 +61,7 @@ func Builder(ctx context.Context, genFunc compose.GenLocalState[*model.State]) (
 	_ = g.AddGraphNode(consts.Coder, NewCoder[string, string](ctx), compose.WithNodeName(consts.Coder))
 	_ = g.AddGraphNode(consts.Reporter, NewReporter[string, string](ctx), compose.WithNodeName(consts.Reporter))
 	_ = g.AddGraphNode(consts.BackgroundInvestigator, NewBackgroundInvestigator[string, string](ctx), compose.WithNodeName(consts.BackgroundInvestigator))
+	_ = g.AddGraphNode(consts.Checkin, NewCheckinNode[string, string](ctx), compose.WithNodeName(consts.Checkin))
 
 	// 每个节点后接 Branch：执行 agentHandOff 读 state.Goto，决定实际下一跳
 	_ = g.AddBranch(consts.Coordinator, compose.NewGraphBranch(agentHandOff, outMap))
@@ -70,6 +72,7 @@ func Builder(ctx context.Context, genFunc compose.GenLocalState[*model.State]) (
 	_ = g.AddBranch(consts.Coder, compose.NewGraphBranch(agentHandOff, outMap))
 	_ = g.AddBranch(consts.Reporter, compose.NewGraphBranch(agentHandOff, outMap))
 	_ = g.AddBranch(consts.BackgroundInvestigator, compose.NewGraphBranch(agentHandOff, outMap))
+	_ = g.AddBranch(consts.Checkin, compose.NewGraphBranch(agentHandOff, outMap))
 
 	_ = g.AddEdge(compose.START, consts.Coordinator)
 

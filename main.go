@@ -43,11 +43,6 @@ func main() {
 		}
 	}
 
-	if os.Getenv("DEEPAGENT_MODE") == "checkin" {
-		runCheckin(cfg)
-		return
-	}
-
 	if os.Getenv("DEEPAGENT_MODE") == "server" {
 		runServer()
 		return
@@ -70,6 +65,7 @@ func runCLI(cfg *conf.Config) {
 		MaxStepNum:                    cfg.Setting.MaxStepNum,
 		AutoAcceptedPlan:              true,
 		EnableBackgroundInvestigation: cfg.Setting.EnableBackgroundInvestigation,
+		ThreadID:                      os.Getenv("DEEPAGENT_THREAD_ID"),
 	}
 
 	genFunc := func(ctx context.Context) *model.State {

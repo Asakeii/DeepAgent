@@ -9,6 +9,7 @@ const (
 	Reporter               = "reporter"
 	BackgroundInvestigator = "background_investigator"
 	Human                  = "human_feedback"
+	Checkin                = "checkin"
 )
 
 const (

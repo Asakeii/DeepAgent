@@ -15,7 +15,7 @@ import (
 )
 
 // loadCoordinatorMessages 负责构造 Coordinator 的输入消息。
-// Coordinator 只做任务分类：闲聊直接回答，复杂研究任务通过工具调用 hand_to_planner 移交 Planner。
+// Coordinator 做意图分类：闲聊直接回答，研究任务 hand_to_planner，打卡/饮食/运动 hand_to_checkin。
 func loadCoordinatorMessages(ctx context.Context, state *model.State) ([]*schema.Message, error) {
 	sysPrompt, err := infra.GetPromptTemplate(ctx, "coordinator")
 	if err != nil {
@@ -38,7 +38,7 @@ func loadCoordinatorMessages(ctx context.Context, state *model.State) ([]*schema
 }
 
 // routeCoordinatorResult 读取 Coordinator 的模型输出，并决定总图下一跳。
-// 如果模型调用 hand_to_planner 工具，说明这是研究任务；否则默认结束。
+// hand_to_planner → 研究流程，hand_to_checkin → 打卡流程，无 tool call → 结束。
 func routeCoordinatorResult(ctx context.Context, state *model.State, input *schema.Message) error {
 	state.Goto = compose.END
 
@@ -47,27 +47,33 @@ func routeCoordinatorResult(ctx context.Context, state *model.State, input *sche
 	}
 
 	toolCall := input.ToolCalls[0]
-	if toolCall.Function.Name != "hand_to_planner" {
-		return nil
+
+	switch toolCall.Function.Name {
+	case "hand_to_planner":
+		argMap := map[string]string{}
+		_ = json.Unmarshal([]byte(toolCall.Function.Arguments), &argMap)
+		if locale := argMap["locale"]; locale != "" {
+			state.Locale = locale
+		}
+		if state.EnableBackgroundInvestigation {
+			state.Goto = consts.BackgroundInvestigator
+		} else {
+			state.Goto = consts.Planner
+		}
+
+	case "hand_to_checkin":
+		argMap := map[string]string{}
+		_ = json.Unmarshal([]byte(toolCall.Function.Arguments), &argMap)
+		if locale := argMap["locale"]; locale != "" {
+			state.Locale = locale
+		}
+		state.Goto = consts.Checkin
 	}
 
-	argMap := map[string]string{}
-	_ = json.Unmarshal([]byte(toolCall.Function.Arguments), &argMap)
-	if locale := argMap["locale"]; locale != "" {
-		state.Locale = locale
-	}
-
-	if state.EnableBackgroundInvestigation {
-		state.Goto = consts.BackgroundInvestigator
-		return nil
-	}
-
-	state.Goto = consts.Planner
 	return nil
 }
 
 // loadCoordinatorMsg 是 Coordinator 子图的 load 节点。
-// 子图节点通过 ProcessState 访问 Eino Graph 的共享 State。
 func loadCoordinatorMsg(ctx context.Context, input string, opts ...any) (output []*schema.Message, err error) {
 	err = compose.ProcessState[*model.State](ctx, func(ctx context.Context, state *model.State) error {
 		output, err = loadCoordinatorMessages(ctx, state)
@@ -77,7 +83,6 @@ func loadCoordinatorMsg(ctx context.Context, input string, opts ...any) (output 
 }
 
 // routerCoordinator 是 Coordinator 子图的 router 节点。
-// 它把模型输出转换成 state.Goto，交给总图的 agentHandOff 继续路由。
 func routerCoordinator(ctx context.Context, input *schema.Message, opts ...any) (output string, err error) {
 	err = compose.ProcessState[*model.State](ctx, func(ctx context.Context, state *model.State) error {
 		if err := routeCoordinatorResult(ctx, state, input); err != nil {
@@ -89,21 +94,20 @@ func routerCoordinator(ctx context.Context, input *schema.Message, opts ...any) 
 	return output, err
 }
 
-// NewCoordinator 构造与 deer-go 对齐的 Coordinator 子图：
+// NewCoordinator 构造 Coordinator 子图：
 //
 //	START -> load -> agent -> router -> END
 func NewCoordinator[I, O any](ctx context.Context) *compose.Graph[I, O] {
 	g := compose.NewGraph[I, O]()
 
-	// 这个工具不是给外部系统调用的真实工具，而是一个“路由信号”：
-	// 模型一旦调用 hand_to_planner，router 就知道要把控制权交给 Planner。
+	// hand_to_planner：模型调用此工具表示"需要进入研究流程"
 	handToPlanner := &schema.ToolInfo{
 		Name: "hand_to_planner",
-		Desc: "Handoff to planner agent to do plan.",
+		Desc: "Handoff to planner agent to do research/investigation task.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"task_title": {
 				Type:     schema.String,
-				Desc:     "The title of the task to be handed off.",
+				Desc:     "The title of the research task to be handed off.",
 				Required: true,
 			},
 			"locale": {
@@ -114,8 +118,26 @@ func NewCoordinator[I, O any](ctx context.Context) *compose.Graph[I, O] {
 		}),
 	}
 
-	// 给 Coordinator 绑定 hand_to_planner，让模型可以用 tool call 表达“需要进入研究流程”。
-	coordinatorModel, err := infra.ChatModel.WithTools([]*schema.ToolInfo{handToPlanner})
+	// hand_to_checkin：模型调用此工具表示"打卡/饮食/运动/自律/图片识别相关"
+	handToCheckin := &schema.ToolInfo{
+		Name: "hand_to_checkin",
+		Desc: "Handoff to checkin coach agent for daily check-in tasks: exercise logging, diet tracking, study recording, food image analysis, and check-in history/summary queries.",
+		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+			"user_message": {
+				Type:     schema.String,
+				Desc:     "The user's original message to forward to checkin agent.",
+				Required: true,
+			},
+			"locale": {
+				Type:     schema.String,
+				Desc:     "The user's detected language locale (e.g., en-US, zh-CN).",
+				Required: true,
+			},
+		}),
+	}
+
+	// 给 Coordinator 绑定两个路由工具
+	coordinatorModel, err := infra.ChatModel.WithTools([]*schema.ToolInfo{handToPlanner, handToCheckin})
 	if err != nil {
 		coordinatorModel = infra.ChatModel
 	}

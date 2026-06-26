@@ -44,6 +44,8 @@ type State struct {
 	AutoAcceptedPlan bool `json:"auto_accepted_plan,omitempty"`
 	// EnableBackgroundInvestigation 为 true 时，Coordinator 后先走背景调查再进 Planner
 	EnableBackgroundInvestigation bool `json:"enable_background_investigation,omitempty"`
+	// ThreadID 会话标识，用于 checkin agent 的跨会话记忆和 checkpoint 恢复
+	ThreadID string `json:"thread_id,omitempty"`
 }
 
 func (s *State) MarshalJSON() ([]byte, error) {
