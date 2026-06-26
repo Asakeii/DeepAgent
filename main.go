@@ -107,16 +107,16 @@ func runCLI(cfg *conf.Config) {
 func runCheckin(cfg *conf.Config) {
 	ctx := context.Background()
 
-	agent, err := agent.NewCheckinAgent(ctx)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// thread_id：用环境变量传入，或用一个默认固定值（单用户 console）。
 	// 无状态：每次调用从 messages 表加载历史、调用后 append。
 	threadID := os.Getenv("DEEPAGENT_THREAD_ID")
 	if threadID == "" {
 		threadID = "console-default"
+	}
+
+	agent, err := agent.NewCheckinAgent(ctx, threadID)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	reader := bufio.NewReader(os.Stdin)

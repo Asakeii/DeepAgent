@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 )
@@ -133,13 +134,15 @@ func joinStrings(ss []string, sep string) string {
 }
 
 // CheckinTools 返回 checkin agent 使用的全部工具（tool.BaseTool 切片，可直接注入 react.AgentConfig.ToolsConfig）。
-// db 由调用方注入（infra.DB），保持无状态与可测试。
-func CheckinTools(ctx context.Context, db *sql.DB) ([]tool.BaseTool, error) {
+// db 由调用方注入（infra.DB），visionModel 为多模态视觉模型（infra.VisionModel），保持无状态与可测试。
+// threadID 由调用方传入（当前会话的 thread），闭包内强制覆盖，避免模型瞎编 thread_id。
+func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel, threadID string) ([]tool.BaseTool, error) {
 	var tools []tool.BaseTool
 
 	rc, err := utils.InferTool("record_checkin",
 		"记录一条用户打卡（学习/运动/饮食等）",
 		func(ctx context.Context, in checkinInput) (checkinOutput, error) {
+			in.ThreadID = threadID // 强制使用当前会话 thread
 			return recordCheckin(ctx, in, db)
 		})
 	if err != nil {
@@ -150,6 +153,7 @@ func CheckinTools(ctx context.Context, db *sql.DB) ([]tool.BaseTool, error) {
 	qc, err := utils.InferTool("query_checkin",
 		"查询用户历史打卡记录",
 		func(ctx context.Context, in queryCheckinInput) (queryCheckinOutput, error) {
+			in.ThreadID = threadID
 			return queryCheckin(ctx, in, db)
 		})
 	if err != nil {
@@ -160,12 +164,24 @@ func CheckinTools(ctx context.Context, db *sql.DB) ([]tool.BaseTool, error) {
 	gs, err := utils.InferTool("get_summary",
 		"汇总用户最近若干天的打卡情况",
 		func(ctx context.Context, in summaryInput) (summaryOutput, error) {
+			in.ThreadID = threadID
 			return getSummary(ctx, in, db)
 		})
 	if err != nil {
 		return nil, fmt.Errorf("infer get_summary: %w", err)
 	}
 	tools = append(tools, gs)
+
+	af, err := utils.InferTool("analyze_food",
+		"分析食物图片，识别所有食物的名称、份量和热量，并自动记录到打卡。用户发食物照片时调用此工具。",
+		func(ctx context.Context, in analyzeInput) (analyzeResult, error) {
+			in.ThreadID = threadID
+			return analyzeFood(ctx, in, db, visionModel)
+		})
+	if err != nil {
+		return nil, fmt.Errorf("infer analyze_food: %w", err)
+	}
+	tools = append(tools, af)
 
 	return tools, nil
 }

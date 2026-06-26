@@ -17,6 +17,8 @@ var (
 	ChatModel *modelopenai.ChatModel
 	// PlanModel 结构化输出模型，强制 Planner 按 model.Plan JSON Schema 返回
 	PlanModel *modelopenai.ChatModel
+	// VisionModel 多模态视觉模型，供识图 agent 使用。未单独配置时回退主 ChatModel。
+	VisionModel *modelopenai.ChatModel
 )
 
 // InitModel 根据配置初始化 ChatModel 与 PlanModel。
@@ -66,6 +68,30 @@ func InitModel(ctx context.Context) error {
 		return fmt.Errorf("init plan model: %w", err)
 	}
 	PlanModel = planModel
+
+	// VisionModel：如果配了 vision_model 段，用它；否则回退主 ChatModel。
+	if vcfg := cfg.VisionModel; vcfg != nil && vcfg.DefaultModel != "" {
+		apiKey := vcfg.APIKey
+		if apiKey == "" {
+			apiKey = cfg.APIKey // 回退主模型的 key
+		}
+		baseURL := vcfg.BaseURL
+		if baseURL == "" {
+			baseURL = cfg.BaseURL
+		}
+		vm, err := modelopenai.NewChatModel(ctx, &modelopenai.ChatModelConfig{
+			BaseURL: baseURL,
+			APIKey:  apiKey,
+			Model:   vcfg.DefaultModel,
+		})
+		if err != nil {
+			return fmt.Errorf("init vision model: %w", err)
+		}
+		VisionModel = vm
+	} else {
+		// 回退：复用主 ChatModel
+		VisionModel = chatModel
+	}
 
 	return nil
 }
