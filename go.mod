@@ -9,6 +9,7 @@ require (
 	github.com/eino-contrib/jsonschema v1.0.3
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/mark3labs/mcp-go v0.54.1
+	github.com/robfig/cron/v3 v3.0.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
