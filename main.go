@@ -18,6 +18,7 @@ import (
 	"deepAgent/internal/handler"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
+	srv "deepAgent/internal/server"
 	"deepAgent/internal/store"
 	"deepAgent/internal/tool"
 )
@@ -164,11 +165,14 @@ func runCheckin(cfg *conf.Config) {
 }
 
 func runServer() {
+	// 启动 MCP bridge（OpenClaw 通过此端口调用 deepAgent 工具）
+	srv.StartMCPServer(":8090")
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/chat/stream", handler.ChatStreamEino)
 
 	addr := ":8080"
-	log.Printf("deepAgent server listening on %s", addr)
+	log.Printf("deepAgent server listening on %s (MCP on :8090)", addr)
 	if err := http.ListenAndServe(addr, withCORS(mux)); err != nil {
 		log.Fatal(err)
 	}
