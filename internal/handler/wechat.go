@@ -16,7 +16,6 @@ import (
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
-	"deepAgent/conf"
 	"deepAgent/internal/agent"
 	"deepAgent/internal/consts"
 	"deepAgent/internal/infra"
@@ -125,27 +124,18 @@ func handleWechatMessage(w http.ResponseWriter, r *http.Request) {
 		userMsg = fmt.Sprintf("打卡早餐 %s", msg.PicURL)
 	}
 
-	state := &model.State{
-		Messages:                      []*schema.Message{schema.UserMessage(userMsg)},
-		Goto:                          consts.Coordinator,
-		Locale:                        "zh-CN",
-		MaxPlanIterations:             conf.App.Setting.MaxPlanIterations,
-		MaxStepNum:                    conf.App.Setting.MaxStepNum,
-		AutoAcceptedPlan:              true,
-		EnableBackgroundInvestigation: conf.App.Setting.EnableBackgroundInvestigation,
-		ThreadID:                      threadID,
+	initMsg := userMsg
+	initThreadID := threadID
+	opts := []compose.Option{
+		compose.WithStateModifier(func(ctx context.Context, path compose.NodePath, s any) error {
+			st := s.(*model.State)
+			st.Messages = []*schema.Message{schema.UserMessage(initMsg)}
+			st.ThreadID = initThreadID
+			return nil
+		}),
 	}
 
-	genFunc := func(ctx context.Context) *model.State {
-		return state
-	}
-
-	runnable, err := agent.Builder(r.Context(), genFunc)
-	if err != nil {
-		log.Printf("[wechat] build graph: %v", err)
-		writeWechatReply(w, msg, "系统繁忙，请稍后再试")
-		return
-	}
+	runnable := agent.GetAgent()
 
 	// collect stream output
 	var sb strings.Builder
@@ -160,10 +150,10 @@ func handleWechatMessage(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	_, err = runnable.Stream(r.Context(), consts.Coordinator,
-		compose.WithCallbacks(&infra.LoggerCallback{
+		append(opts, compose.WithCallbacks(&infra.LoggerCallback{
 			ID:  threadID,
 			Out: outChan,
-		}),
+		}))...,
 	)
 	close(outChan)
 	<-done

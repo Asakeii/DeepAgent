@@ -154,16 +154,9 @@ func routerPlanner(ctx context.Context, input *schema.Message, opts ...any) (out
 //
 // 当前保留 RunPlanner 作为教学版直接调用入口；后续 Builder 会改为 AddGraphNode 使用此子图。
 func NewPlanner[I, O any](ctx context.Context) *compose.Graph[I, O] {
-	g := compose.NewGraph[I, O]()
-
-	_ = g.AddLambdaNode("load", compose.InvokableLambdaWithOption(loadPlannerMsg))
-	_ = g.AddChatModelNode("agent", infra.PlanModel)
-	_ = g.AddLambdaNode("router", compose.InvokableLambdaWithOption(routerPlanner))
-
-	_ = g.AddEdge(compose.START, "load")
-	_ = g.AddEdge("load", "agent")
-	_ = g.AddEdge("agent", "router")
-	_ = g.AddEdge("router", compose.END)
-
-	return g
+	return buildLoadAgentRouter(
+		compose.InvokableLambdaWithOption(loadPlannerMsg),
+		withChatModel[I, O](infra.PlanModel),
+		compose.InvokableLambdaWithOption(routerPlanner),
+	)
 }

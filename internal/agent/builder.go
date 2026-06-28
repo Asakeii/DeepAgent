@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"sync"
 
 	"github.com/cloudwego/eino/compose"
 
@@ -10,36 +11,71 @@ import (
 	"deepAgent/internal/model"
 )
 
-// agentHandOff 是总图的分支路由函数。
-// 每个 Agent 节点执行完后会写入 state.Goto；本函数读取 Goto，告诉 Eino 下一跳去哪个节点。
-// 这是 deer-go 的「轻量路由协议」：节点不直接调用下一个节点，只改 State，由总图统一调度。
+// ---------------------------------------------------------------
+// 全局单次编译的 Runnable（compile-once）。
+// Handler 通过 GetAgent() 获取，用 WithStateModifier 注入请求级 State。
+// ---------------------------------------------------------------
+
+var (
+	globalRunnable   compose.Runnable[string, string]
+	globalRunnableMu sync.Mutex
+)
+
+// GetAgent returns the compile-once global Runnable.
+// Call InitAgent first during server startup.
+func GetAgent() compose.Runnable[string, string] {
+	globalRunnableMu.Lock()
+	defer globalRunnableMu.Unlock()
+	return globalRunnable
+}
+
+// InitAgent compiles the full agent graph once. Must be called after InitDB/InitModel/InitMCP.
+func InitAgent(ctx context.Context) error {
+	globalRunnableMu.Lock()
+	defer globalRunnableMu.Unlock()
+	if globalRunnable != nil {
+		return nil // already compiled
+	}
+	r, err := compileGraph(ctx)
+	if err != nil {
+		return err
+	}
+	globalRunnable = r
+	return nil
+}
+
+// ---------------------------------------------------------------
+// 图路由与编译
+// ---------------------------------------------------------------
+
+// agentHandOff is the main graph branch function: reads state.Goto to decide next hop.
 func agentHandOff(ctx context.Context, input string) (string, error) {
 	next := compose.END
-
 	err := compose.ProcessState[*model.State](ctx, func(ctx context.Context, state *model.State) error {
 		next = state.Goto
 		return nil
 	})
-
 	return next, err
 }
 
-// Builder 组装 DeepAgent 总图并编译为 Runnable。
-//
-// 图结构示意：
-//
-//	START -> Coordinator -> Planner -+-> Human -> ...
-//	                               +-> ResearchTeam -> Researcher/Coder -> ...
-//	                               +-> Reporter -> END
-//
-// genFunc 由调用方传入，负责创建/初始化每次运行共享的 *model.State。
-// 每个 Agent 都通过 AddGraphNode 接入子图，子图内部再拆成 load/agent/router 或 router。
-func Builder(ctx context.Context, genFunc compose.GenLocalState[*model.State]) (compose.Runnable[string, string], error) {
+// compileGraph builds and compiles the complete agent graph once.
+// genFunc creates a default State; request details are injected via WithStateModifier at Stream time.
+func compileGraph(ctx context.Context) (compose.Runnable[string, string], error) {
+	defaultGenFunc := func(ctx context.Context) *model.State {
+		return &model.State{
+			Goto:                          consts.Coordinator,
+			Locale:                        "zh-CN",
+			MaxPlanIterations:             1,
+			MaxStepNum:                    3,
+			AutoAcceptedPlan:              true,
+			EnableBackgroundInvestigation: false,
+		}
+	}
+
 	g := compose.NewGraph[string, string](
-		compose.WithGenLocalState(genFunc),
+		compose.WithGenLocalState(defaultGenFunc),
 	)
 
-	// outMap 声明每个分支节点允许跳转的目标；agentHandOff 的返回值必须在此 map 中。
 	outMap := map[string]bool{
 		consts.Coordinator:            true,
 		consts.Planner:                true,
@@ -63,7 +99,6 @@ func Builder(ctx context.Context, genFunc compose.GenLocalState[*model.State]) (
 	_ = g.AddGraphNode(consts.BackgroundInvestigator, NewBackgroundInvestigator[string, string](ctx), compose.WithNodeName(consts.BackgroundInvestigator))
 	_ = g.AddGraphNode(consts.Checkin, NewCheckinNode[string, string](ctx), compose.WithNodeName(consts.Checkin))
 
-	// 每个节点后接 Branch：执行 agentHandOff 读 state.Goto，决定实际下一跳
 	_ = g.AddBranch(consts.Coordinator, compose.NewGraphBranch(agentHandOff, outMap))
 	_ = g.AddBranch(consts.Planner, compose.NewGraphBranch(agentHandOff, outMap))
 	_ = g.AddBranch(consts.Human, compose.NewGraphBranch(agentHandOff, outMap))

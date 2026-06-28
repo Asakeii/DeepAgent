@@ -60,12 +60,10 @@ func routerCheckin(ctx context.Context, input *schema.Message, opts ...any) (out
 
 // NewCheckinNode 构造 Checkin 子图：START -> load -> agent(ReAct) -> router -> END
 func NewCheckinNode[I, O any](ctx context.Context) *compose.Graph[I, O] {
-	g := compose.NewGraph[I, O]()
-
 	checkinAgent, err := NewCheckinAgent(ctx)
 	if err != nil {
 		fmt.Printf("WARNING: NewCheckinAgent failed: %v\n", err)
-		return g
+		return compose.NewGraph[I, O]()
 	}
 
 	// 用 AnyLambda wrapper：从 state.ThreadID 注入 context，让 tools 在运行时
@@ -99,17 +97,12 @@ func NewCheckinNode[I, O any](ctx context.Context) *compose.Graph[I, O] {
 	)
 	if err != nil {
 		fmt.Printf("WARNING: AnyLambda failed: %v\n", err)
-		return g
+		return compose.NewGraph[I, O]()
 	}
 
-	_ = g.AddLambdaNode("load", compose.InvokableLambdaWithOption(loadCheckinMsg))
-	_ = g.AddLambdaNode("agent", agentLambda)
-	_ = g.AddLambdaNode("router", compose.InvokableLambdaWithOption(routerCheckin))
-
-	_ = g.AddEdge(compose.START, "load")
-	_ = g.AddEdge("load", "agent")
-	_ = g.AddEdge("agent", "router")
-	_ = g.AddEdge("router", compose.END)
-
-	return g
+	return buildLoadAgentRouter(
+		compose.InvokableLambdaWithOption(loadCheckinMsg),
+		withLambda[I, O](agentLambda),
+		compose.InvokableLambdaWithOption(routerCheckin),
+	)
 }

@@ -133,8 +133,6 @@ func modifyResearcherInput(ctx context.Context, input []*schema.Message) []*sche
 // NewResearcher 构造 Researcher 子图，与 deer-go 对齐为 load -> ReAct agent -> router。
 // Researcher 会挂载当前已初始化的所有 MCP tools，用于搜索、抓取或其他外部信息收集。
 func NewResearcher[I, O any](ctx context.Context) *compose.Graph[I, O] {
-	g := compose.NewGraph[I, O]()
-
 	researchTools := []tool.BaseTool{}
 
 	// Researcher 使用全部 MCP server 暴露的工具；Coder 则只使用 python 开头的工具。
@@ -165,16 +163,11 @@ func NewResearcher[I, O any](ctx context.Context) *compose.Graph[I, O] {
 		panic(err)
 	}
 
-	_ = g.AddLambdaNode("load", compose.InvokableLambdaWithOption(loadResearcherMsg))
-	_ = g.AddLambdaNode("agent", agentLambda)
-	_ = g.AddLambdaNode("router", compose.InvokableLambdaWithOption(routerResearcher))
-
-	_ = g.AddEdge(compose.START, "load")
-	_ = g.AddEdge("load", "agent")
-	_ = g.AddEdge("agent", "router")
-	_ = g.AddEdge("router", compose.END)
-
-	return g
+	return buildLoadAgentRouter(
+		compose.InvokableLambdaWithOption(loadResearcherMsg),
+		withLambda[I, O](agentLambda),
+		compose.InvokableLambdaWithOption(routerResearcher),
+	)
 }
 
 // findCurrentStep 返回计划中第一个 ExecutionRes 为 nil 的 step 及其下标。
