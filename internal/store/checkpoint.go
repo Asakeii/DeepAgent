@@ -14,6 +14,9 @@ type MySQLCheckPoint struct {
 }
 
 func NewMySQLCheckPoint(db *sql.DB) compose.CheckPointStore {
+	if db == nil {
+		panic("NewMySQLCheckPoint: db must not be nil")
+	}
 	return &MySQLCheckPoint{db: db}
 }
 
