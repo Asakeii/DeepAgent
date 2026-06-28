@@ -12,7 +12,6 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 
-	"deepAgent/conf"
 	"deepAgent/internal/agent"
 	"deepAgent/internal/consts"
 	"deepAgent/internal/infra"
@@ -67,28 +66,21 @@ func handleChat(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResu
 		threadID = "openclaw-default"
 	}
 
-	// Construct state matching the HTTP handler pattern
-	state := &model.State{
-		Messages:                      []*schema.Message{schema.UserMessage(msg)},
-		Goto:                          consts.Coordinator,
-		Locale:                        "zh-CN",
-		MaxPlanIterations:             conf.App.Setting.MaxPlanIterations,
-		MaxStepNum:                    conf.App.Setting.MaxStepNum,
-		AutoAcceptedPlan:              true,
-		EnableBackgroundInvestigation: conf.App.Setting.EnableBackgroundInvestigation,
-		ThreadID:                      threadID,
+	initMsg := msg
+	initThreadID := threadID
+	opts := []compose.Option{
+		compose.WithStateModifier(func(ctx context.Context, path compose.NodePath, s any) error {
+			st := s.(*model.State)
+			st.Messages = []*schema.Message{schema.UserMessage(initMsg)}
+			st.ThreadID = initThreadID
+			return nil
+		}),
 	}
 
-	genFunc := func(ctx context.Context) *model.State {
-		return state
-	}
-
-	r, err := agent.Builder(ctx, genFunc)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("build graph: %v", err)), nil
-	}
+	r := agent.GetAgent()
 
 	// Collect stream output
+	var err error
 	var sb strings.Builder
 	outChan := make(chan string)
 	done := make(chan struct{})
@@ -101,10 +93,10 @@ func handleChat(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResu
 	}()
 
 	_, err = r.Stream(ctx, consts.Coordinator,
-		compose.WithCallbacks(&infra.LoggerCallback{
+		append(opts, compose.WithCallbacks(&infra.LoggerCallback{
 			ID:  threadID,
 			Out: outChan,
-		}),
+		}))...,
 	)
 	close(outChan)
 	<-done

@@ -8,9 +8,7 @@ import (
 	"strings"
 
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 
-	"deepAgent/conf"
 	"deepAgent/internal/agent"
 	"deepAgent/internal/consts"
 	"deepAgent/internal/infra"
@@ -40,47 +38,39 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 		req.InterruptFeedback = NormalizeInterruptFeedback(req.InterruptFeedback)
 	}
 
-	state := &model.State{
-		Messages:                      req.Messages,
-		Goto:                          consts.Coordinator,
-		Locale:                        "zh-CN",
-		MaxPlanIterations:             conf.App.Setting.MaxPlanIterations,
-		MaxStepNum:                    conf.App.Setting.MaxStepNum,
-		AutoAcceptedPlan:              req.AutoAcceptedPlan,
-		EnableBackgroundInvestigation: req.EnableBackgroundInvestigation,
-		ThreadID:                      req.ThreadID,
-	}
-	if req.MaxPlanIterations > 0 {
-		state.MaxPlanIterations = req.MaxPlanIterations
-	}
-	if req.MaxStepNum > 0 {
-		state.MaxStepNum = req.MaxStepNum
-	}
-	if state.Messages == nil {
-		state.Messages = []*schema.Message{}
-	}
+	runnable := agent.GetAgent()
 
-	runnable, err := agent.Builder(ctx, func(ctx context.Context) *model.State {
-		return state
-	})
-	if err != nil {
-		_ = sse.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "build graph failed: " + err.Error()})
-		return
-	}
-
-	opts := []compose.Option{}
-	if req.ThreadID != "" {
-		opts = append(opts, compose.WithCheckPointID(req.ThreadID))
-	}
-	if req.InterruptFeedback != "" {
-		opts = append(opts, compose.WithStateModifier(func(ctx context.Context, path compose.NodePath, s any) error {
+	opts := []compose.Option{
+		// 注入请求级 State（Messages/ThreadID 等；genFunc 已创建默认 State）
+		compose.WithStateModifier(func(ctx context.Context, path compose.NodePath, s any) error {
 			st := s.(*model.State)
-			st.InterruptFeedback = req.InterruptFeedback
-			if req.InterruptFeedback == consts.EditPlan && len(req.Messages) > 0 {
-				st.Messages = append(st.Messages, req.Messages...)
+			if req.Messages != nil {
+				st.Messages = req.Messages
+			}
+			if req.ThreadID != "" {
+				st.ThreadID = req.ThreadID
+			}
+			st.Locale = "zh-CN"
+			if req.MaxPlanIterations > 0 {
+				st.MaxPlanIterations = req.MaxPlanIterations
+			}
+			if req.MaxStepNum > 0 {
+				st.MaxStepNum = req.MaxStepNum
+			}
+			st.AutoAcceptedPlan = req.AutoAcceptedPlan
+			st.EnableBackgroundInvestigation = req.EnableBackgroundInvestigation
+			// 中断恢复
+			if req.InterruptFeedback != "" {
+				st.InterruptFeedback = req.InterruptFeedback
+				if req.InterruptFeedback == consts.EditPlan && len(req.Messages) > 0 {
+					st.Messages = append(st.Messages, req.Messages...)
+				}
 			}
 			return nil
-		}))
+		}),
+	}
+	if req.ThreadID != "" {
+		opts = append(opts, compose.WithCheckPointID(req.ThreadID))
 	}
 	opts = append(opts, compose.WithCallbacks(&infra.LoggerCallback{
 		ID:  req.ThreadID,
