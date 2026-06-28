@@ -170,9 +170,10 @@ func runServer() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/chat/stream", handler.ChatStreamEino)
+	mux.HandleFunc("/wechat/callback", handler.WechatCallback)
 
 	addr := ":8080"
-	log.Printf("deepAgent server listening on %s (MCP on :8090)", addr)
+	log.Printf("deepAgent server listening on %s (MCP on :8090, wechat on /wechat/callback)", addr)
 	if err := http.ListenAndServe(addr, withCORS(mux)); err != nil {
 		log.Fatal(err)
 	}
