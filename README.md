@@ -87,12 +87,36 @@ database:
 ## 路线（自律打卡助手扩展）
 
 在现有研究图基础上扩展（设计见 `docs/design-checkin-assistant.md`）：
-- **Stage 1（✅ 完成）**：docker 部署 + MySQL 存储 + 无状态 checkpoint + 中断恢复。
-- Stage 2: 打卡工具（`InferTool`）+ 轻交互 ReAct agent。
-- Stage 3: 多模态识图 agent（食物图片→能量摄入→写库）。
-- Stage 4: Coordinator 多 handoff tool 意图分类（对齐 deer-go）。
-- Stage 5: 定时提醒（agent tool + 无状态扫表 ticker）。
-- Stage 6: 接入微信。
+- ✅ Stage 1: docker 部署 + MySQL 存储 + 无状态 checkpoint + 中断恢复
+- ✅ Stage 2: 打卡工具（`InferTool`）+ 轻交互 ReAct agent + 跨会话记忆
+- ✅ Stage 3: 多模态识图 agent（食物图片→能量摄入→写库）
+- ✅ Stage 4: Coordinator 多 handoff tool 统一入口路由
+- ✅ Stage 5: 定时提醒（agent tool + 无状态扫表 ticker）
+- ✅ Stage 6: 微信原生回调 + MCP bridge
+
+## 微信接入
+
+deepAgent 提供原生微信公众号回调接口（`/wechat/callback`），无需 OpenClaw 等中间层。
+
+**前提条件：** 微信公众号（服务号/订阅号），服务有公网域名。
+
+**配置步骤：**
+1. 设置环境变量 `WECHAT_TOKEN`（docker compose 中已预留）
+2. 在微信公众号后台配置服务器 URL：`https://your-domain/wechat/callback`
+3. Token 填入 docker compose 中的 `WECHAT_TOKEN` 值
+4. 微信服务器发送 GET 请求验证 → SHA1 签名校验 + echostr 回传
+5. 验证通过后，用户消息通过 POST 回调到达，走 Coordinator 自动路由处理
+
+**微信消息流程：** 用户发消息 → 微信服务器 POST XML → `/wechat/callback` → Coordinator 路由 → XML 回复 → 微信推送
+
+## 外部接入（MCP bridge）
+
+deepAgent 同时暴露 MCP bridge（`:8090`），支持通过 MCP 协议被外部 AI 网关调用：
+- `GET /sse` — MCP SSE 连接端点
+- `POST /message` — MCP JSON-RPC 消息端点
+- 暴露 `chat` 和 `list_capabilities` 两个工具
+
+任何支持 MCP 客户端的框架（OpenClaw、LangChain、自研 agent 等）均可通过此端口调用 deepAgent。
 
 ## 参考
 
