@@ -68,11 +68,13 @@ func handleChat(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResu
 
 	initMsg := msg
 	initThreadID := threadID
+	var routedToCheckin bool
 	opts := []compose.Option{
 		compose.WithStateModifier(func(ctx context.Context, path compose.NodePath, s any) error {
 			st := s.(*model.State)
 			st.Messages = []*schema.Message{schema.UserMessage(initMsg)}
 			st.ThreadID = initThreadID
+			routedToCheckin = st.RouteToCheckin
 			return nil
 		}),
 	}
@@ -107,6 +109,15 @@ func handleChat(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResu
 			return mcp.NewToolResultText(fmt.Sprintf("%s\n\n[graph ended: %v]", sb.String(), err)), nil
 		}
 		return mcp.NewToolResultError(fmt.Sprintf("graph run: %v", err)), nil
+	}
+
+	// Coordinator 标记打卡路由时，切到 checkin agent
+	if routedToCheckin {
+		resp, cerr := agent.RunCheckin(context.Background(), []*schema.Message{schema.UserMessage(initMsg)}, initThreadID)
+		if cerr != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("checkin: %v", cerr)), nil
+		}
+		return mcp.NewToolResultText(resp.Content), nil
 	}
 
 	result := strings.TrimSpace(sb.String())

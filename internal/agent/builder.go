@@ -85,7 +85,6 @@ func compileGraph(ctx context.Context) (compose.Runnable[string, string], error)
 		consts.Coder:                  true,
 		consts.Reporter:               true,
 		consts.BackgroundInvestigator: true,
-		consts.Checkin:                true,
 		compose.END:                   true,
 	}
 
@@ -97,7 +96,6 @@ func compileGraph(ctx context.Context) (compose.Runnable[string, string], error)
 	_ = g.AddGraphNode(consts.Coder, NewCoder[string, string](ctx), compose.WithNodeName(consts.Coder))
 	_ = g.AddGraphNode(consts.Reporter, NewReporter[string, string](ctx), compose.WithNodeName(consts.Reporter))
 	_ = g.AddGraphNode(consts.BackgroundInvestigator, NewBackgroundInvestigator[string, string](ctx), compose.WithNodeName(consts.BackgroundInvestigator))
-	_ = g.AddGraphNode(consts.Checkin, NewCheckinNode[string, string](ctx), compose.WithNodeName(consts.Checkin))
 
 	_ = g.AddBranch(consts.Coordinator, compose.NewGraphBranch(agentHandOff, outMap))
 	_ = g.AddBranch(consts.Planner, compose.NewGraphBranch(agentHandOff, outMap))
@@ -107,7 +105,6 @@ func compileGraph(ctx context.Context) (compose.Runnable[string, string], error)
 	_ = g.AddBranch(consts.Coder, compose.NewGraphBranch(agentHandOff, outMap))
 	_ = g.AddBranch(consts.Reporter, compose.NewGraphBranch(agentHandOff, outMap))
 	_ = g.AddBranch(consts.BackgroundInvestigator, compose.NewGraphBranch(agentHandOff, outMap))
-	_ = g.AddBranch(consts.Checkin, compose.NewGraphBranch(agentHandOff, outMap))
 
 	_ = g.AddEdge(compose.START, consts.Coordinator)
 

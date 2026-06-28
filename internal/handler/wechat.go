@@ -126,11 +126,13 @@ func handleWechatMessage(w http.ResponseWriter, r *http.Request) {
 
 	initMsg := userMsg
 	initThreadID := threadID
+	var routedToCheckin bool
 	opts := []compose.Option{
 		compose.WithStateModifier(func(ctx context.Context, path compose.NodePath, s any) error {
 			st := s.(*model.State)
 			st.Messages = []*schema.Message{schema.UserMessage(initMsg)}
 			st.ThreadID = initThreadID
+			routedToCheckin = st.RouteToCheckin
 			return nil
 		}),
 	}
@@ -162,6 +164,17 @@ func handleWechatMessage(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[wechat] graph error: %v", err)
 		if sb.Len() > 0 {
 			writeWechatReply(w, msg, sb.String())
+		} else {
+			writeWechatReply(w, msg, "处理出错，请稍后再试")
+		}
+		return
+	}
+
+	// Coordinator 标记打卡路由时，切到 checkin agent
+	if routedToCheckin {
+		resp, cerr := agent.RunCheckin(context.Background(), []*schema.Message{schema.UserMessage(initMsg)}, initThreadID)
+		if cerr == nil {
+			writeWechatReply(w, msg, resp.Content)
 		} else {
 			writeWechatReply(w, msg, "处理出错，请稍后再试")
 		}
