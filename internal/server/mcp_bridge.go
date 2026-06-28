@@ -140,12 +140,10 @@ func handleListCapabilities(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 }
 
 // NewMCPSSEServer creates an SSE transport wrapper for the MCP server.
+// Uses default endpoints: GET /sse (SSE stream), POST /message (JSON-RPC)
 func NewMCPSSEServer() *mcpserver.SSEServer {
 	bridge := NewMCPBridge()
-	return mcpserver.NewSSEServer(bridge,
-		mcpserver.WithSSEEndpoint("/mcp/sse"),
-		mcpserver.WithMessageEndpoint("/mcp/message"),
-	)
+	return mcpserver.NewSSEServer(bridge)
 }
 
 // StartMCPServer starts the MCP SSE server on the given address.
