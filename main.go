@@ -70,6 +70,7 @@ func runCLI(cfg *conf.Config) {
 	// 注入请求级 State
 	msg := schema.UserMessage(userPrompt)
 	threadID := os.Getenv("DEEPAGENT_THREAD_ID")
+	var routedToCheckin bool
 	opts := []compose.Option{
 		compose.WithStateModifier(func(ctx context.Context, path compose.NodePath, s any) error {
 			st := s.(*model.State)
@@ -78,6 +79,7 @@ func runCLI(cfg *conf.Config) {
 			st.MaxPlanIterations = cfg.Setting.MaxPlanIterations
 			st.MaxStepNum = cfg.Setting.MaxStepNum
 			st.ThreadID = threadID
+			routedToCheckin = st.RouteToCheckin
 			return nil
 		}),
 	}
@@ -101,6 +103,17 @@ func runCLI(cfg *conf.Config) {
 	close(outChan)
 	if err != nil {
 		log.Fatal(err)
+	}
+	// Coordinator 标记打卡路由时，切到 checkin agent
+	if routedToCheckin {
+		resp, cerr := agent.RunCheckin(context.Background(), []*schema.Message{msg}, threadID)
+		if cerr != nil {
+			log.Printf("[checkin] %v", cerr)
+		} else {
+			fmt.Println()
+			fmt.Println(resp.Content)
+		}
+		return
 	}
 	fmt.Println()
 }

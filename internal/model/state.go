@@ -46,6 +46,8 @@ type State struct {
 	EnableBackgroundInvestigation bool `json:"enable_background_investigation,omitempty"`
 	// ThreadID 会话标识，用于 checkin agent 的跨会话记忆和 checkpoint 恢复
 	ThreadID string `json:"thread_id,omitempty"`
+	// RouteToCheckin Coachinator 判定为打卡任务时设为 true；handler 读到后切到 checkin agent 执行
+	RouteToCheckin bool `json:"route_to_checkin,omitempty"`
 }
 
 func (s *State) MarshalJSON() ([]byte, error) {

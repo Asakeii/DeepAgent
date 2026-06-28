@@ -34,6 +34,20 @@ func NewCheckinAgent(ctx context.Context) (*react.Agent, error) {
 	return agent, nil
 }
 
+// RunCheckin 被 handler 层调用（Coordinator 标记 RouteToCheckin=true 后）。
+// 从研究图的 State 中提取用户消息和 threadID，改为走独立的 checkin agent 处理。
+func RunCheckin(ctx context.Context, msg []*schema.Message, threadID string) (*schema.Message, error) {
+	agent, err := NewCheckinAgent(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("new checkin agent: %w", err)
+	}
+	agentCtx := ctx
+	if threadID != "" {
+		agentCtx = tool.WithThreadID(ctx, threadID)
+	}
+	return agent.Generate(agentCtx, msg)
+}
+
 // checkinMessageModifier 在每次模型调用前注入 system prompt。
 func checkinMessageModifier(ctx context.Context, msgs []*schema.Message) []*schema.Message {
 	sysPrompt, err := infra.GetPromptTemplate(ctx, "checkin_coach")
