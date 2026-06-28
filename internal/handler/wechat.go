@@ -106,8 +106,11 @@ func handleWechatMessage(w http.ResponseWriter, r *http.Request) {
 
 	var msg wechatMsg
 	if err := xml.Unmarshal(body, &msg); err != nil {
-		log.Printf("[wechat] XML parse error: %v", err)
-		writeWechatReply(w, msg, "收到消息但格式有误，请发送文字消息")
+		log.Printf("[wechat] XML parse error: %v, body=%s", err, string(body[:min(len(body), 200)]))
+		// XML 解析失败时 msg 为零值，无法构造有效回复（ToUserName/FromUserName 为空）；
+		// 返回 HTTP 200 + 空字符串（微信要求必须 200，否则会重试）
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("success"))
 		return
 	}
 
