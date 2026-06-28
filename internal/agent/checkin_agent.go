@@ -35,17 +35,33 @@ func NewCheckinAgent(ctx context.Context) (*react.Agent, error) {
 }
 
 // RunCheckin 被 handler 层调用（Coordinator 标记 RouteToCheckin=true 后）。
-// 从研究图的 State 中提取用户消息和 threadID，改为走独立的 checkin agent 处理。
-func RunCheckin(ctx context.Context, msg []*schema.Message, threadID string) (*schema.Message, error) {
+// 加载跨会话历史、持久化消息、调 checkin agent。
+func RunCheckin(ctx context.Context, msgs []*schema.Message, threadID string) (*schema.Message, error) {
+	if threadID == "" {
+		threadID = "console-default"
+	}
+
 	agent, err := NewCheckinAgent(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("new checkin agent: %w", err)
 	}
-	agentCtx := ctx
-	if threadID != "" {
-		agentCtx = tool.WithThreadID(ctx, threadID)
+
+	// 加载历史 + 记录用户消息
+	history, _ := infra.RecentMessagesForCheckin(ctx, threadID, 20)
+	prompt := append(history, msgs...)
+	for _, m := range msgs {
+		_ = infra.AppendMessageForCheckin(ctx, threadID, string(m.Role), m.Content)
 	}
-	return agent.Generate(agentCtx, msg)
+
+	agentCtx := tool.WithThreadID(ctx, threadID)
+	resp, err := agent.Generate(agentCtx, prompt)
+	if err != nil {
+		return nil, err
+	}
+
+	// 记录助手回复
+	_ = infra.AppendMessageForCheckin(ctx, threadID, string(schema.Assistant), resp.Content)
+	return resp, nil
 }
 
 // checkinMessageModifier 在每次模型调用前注入 system prompt。
