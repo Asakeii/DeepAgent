@@ -98,8 +98,6 @@ func routerCoordinator(ctx context.Context, input *schema.Message, opts ...any) 
 //
 //	START -> load -> agent -> router -> END
 func NewCoordinator[I, O any](ctx context.Context) *compose.Graph[I, O] {
-	g := compose.NewGraph[I, O]()
-
 	// hand_to_planner：模型调用此工具表示"需要进入研究流程"
 	handToPlanner := &schema.ToolInfo{
 		Name: "hand_to_planner",
@@ -142,14 +140,9 @@ func NewCoordinator[I, O any](ctx context.Context) *compose.Graph[I, O] {
 		coordinatorModel = infra.ChatModel
 	}
 
-	_ = g.AddLambdaNode("load", compose.InvokableLambdaWithOption(loadCoordinatorMsg))
-	_ = g.AddChatModelNode("agent", coordinatorModel)
-	_ = g.AddLambdaNode("router", compose.InvokableLambdaWithOption(routerCoordinator))
-
-	_ = g.AddEdge(compose.START, "load")
-	_ = g.AddEdge("load", "agent")
-	_ = g.AddEdge("agent", "router")
-	_ = g.AddEdge("router", compose.END)
-
-	return g
+	return buildLoadAgentRouter(
+		compose.InvokableLambdaWithOption(loadCoordinatorMsg),
+		withChatModel[I, O](coordinatorModel),
+		compose.InvokableLambdaWithOption(routerCoordinator),
+	)
 }

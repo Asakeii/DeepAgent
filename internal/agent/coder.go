@@ -160,8 +160,6 @@ func toolCallChecker(_ context.Context, sr *schema.StreamReader[*schema.Message]
 //	agent   ReAct 循环：模型可多次调用 Python MCP tools（execute_python 等）
 //	router  把 agent 最终回复写入 ExecutionRes，Goto = ResearchTeam
 func NewCoder[I, O any](ctx context.Context) *compose.Graph[I, O] {
-	g := compose.NewGraph[I, O]()
-
 	// 只挂载名字以 python 开头的 MCP server 的 tools，与 Researcher 的搜索 tools 隔离
 	coderTools := []tool.BaseTool{}
 
@@ -197,14 +195,9 @@ func NewCoder[I, O any](ctx context.Context) *compose.Graph[I, O] {
 		panic(err)
 	}
 
-	_ = g.AddLambdaNode("load", compose.InvokableLambdaWithOption(loadCoderMsg))
-	_ = g.AddLambdaNode("agent", agentLambda)
-	_ = g.AddLambdaNode("router", compose.InvokableLambdaWithOption(routerCoder))
-
-	_ = g.AddEdge(compose.START, "load")
-	_ = g.AddEdge("load", "agent")
-	_ = g.AddEdge("agent", "router")
-	_ = g.AddEdge("router", compose.END)
-
-	return g
+	return buildLoadAgentRouter(
+		compose.InvokableLambdaWithOption(loadCoderMsg),
+		withLambda[I, O](agentLambda),
+		compose.InvokableLambdaWithOption(routerCoder),
+	)
 }

@@ -106,16 +106,9 @@ func routerReporter(ctx context.Context, input *schema.Message, opts ...any) (ou
 //
 //	START -> load -> agent -> router -> END
 func NewReporter[I, O any](ctx context.Context) *compose.Graph[I, O] {
-	g := compose.NewGraph[I, O]()
-
-	_ = g.AddLambdaNode("load", compose.InvokableLambdaWithOption(loadReporterMsg))
-	_ = g.AddChatModelNode("agent", infra.ChatModel)
-	_ = g.AddLambdaNode("router", compose.InvokableLambdaWithOption(routerReporter))
-
-	_ = g.AddEdge(compose.START, "load")
-	_ = g.AddEdge("load", "agent")
-	_ = g.AddEdge("agent", "router")
-	_ = g.AddEdge("router", compose.END)
-
-	return g
+	return buildLoadAgentRouter(
+		compose.InvokableLambdaWithOption(loadReporterMsg),
+		withChatModel[I, O](infra.ChatModel),
+		compose.InvokableLambdaWithOption(routerReporter),
+	)
 }
