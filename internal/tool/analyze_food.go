@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,10 +16,12 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
+const maxImageBytes = 20 << 20 // 20MB image size limit
+
 // analyzeInput 是 analyze_food 工具的入参。
 type analyzeInput struct {
 	ThreadID  string `json:"thread_id" jsonschema:"required" jsonschema_description:"会话 thread_id"`
-	ImagePath string `json:"image_path" jsonschema:"required" jsonschema_description:"本地图片路径（支持 jpg/png/webp）"`
+	ImagePath string `json:"image_path" jsonschema:"required" jsonschema_description:"图片路径（本地文件路径或 HTTP/HTTPS URL）"`
 }
 
 // foodItem 是模型返回的单个食物分析结果。
@@ -48,27 +52,16 @@ const analyzeFoodPrompt = `请分析这张图片中的所有食物。对每种�
   "summary": "一句话总结这顿饭的营养特点"
 }`
 
-// analyzeFood 读取本地图片，调用 VisionModel 分析食物热量，并批量写入 checkins 表。
+// analyzeFood 读取图片（支持本地路径和 HTTP URL），调用 VisionModel 分析食物热量，并批量写入 checkins 表。
 func analyzeFood(ctx context.Context, in analyzeInput, db *sql.DB, visionModel model.ChatModel) (analyzeResult, error) {
 	if in.ThreadID == "" || in.ImagePath == "" {
 		return analyzeResult{}, fmt.Errorf("thread_id and image_path required")
 	}
 
-	// 1. 读取图片并 base64 编码
-	imgData, err := os.ReadFile(in.ImagePath)
+	// 1. 读取图片并 base64 编码（支持本地路径和 HTTP URL）
+	imgData, mimeType, err := readImage(in.ImagePath)
 	if err != nil {
-		return analyzeResult{}, fmt.Errorf("read image %s: %w", in.ImagePath, err)
-	}
-
-	ext := strings.ToLower(filepath.Ext(in.ImagePath))
-	mimeType := "image/jpeg"
-	switch ext {
-	case ".png":
-		mimeType = "image/png"
-	case ".webp":
-		mimeType = "image/webp"
-	case ".gif":
-		mimeType = "image/gif"
+		return analyzeResult{}, fmt.Errorf("read image: %w", err)
 	}
 
 	b64 := base64.StdEncoding.EncodeToString(imgData)
@@ -90,24 +83,13 @@ func analyzeFood(ctx context.Context, in analyzeInput, db *sql.DB, visionModel m
 		return analyzeResult{}, fmt.Errorf("vision model generate: %w", err)
 	}
 
-	// 3. 解析 JSON 结果
-	content := resp.Content
-	// 模型可能在 JSON 外包了 ```json ... ```，去掉
-	content = strings.TrimSpace(content)
-	if strings.HasPrefix(content, "```") {
-		lines := strings.Split(content, "\n")
-		// 去掉第一行 ```json 和最后一行 ```
-		if len(lines) > 2 {
-			content = strings.Join(lines[1:len(lines)-1], "\n")
-		}
-	}
+	// 3. 解析 JSON 结果（用与 planner.go 同模式的 code-fence 剥离）
+	content := extractCodeFenceJSON(resp.Content)
 
 	var result analyzeResult
 	if err := json.Unmarshal([]byte(content), &result); err != nil {
-		// 解析失败，把原始内容作为 summary 返回（降级：至少用户能看到分析结果）
-		return analyzeResult{
-			Summary: content,
-		}, nil
+		// 解析失败时返回 error（而非静默返回空结果），让 agent 感知并报告用户
+		return analyzeResult{}, fmt.Errorf("parse food analysis JSON: %w\nraw: %s", err, content)
 	}
 
 	// 4. 批量写入 checkins 表
@@ -119,7 +101,6 @@ func analyzeFood(ctx context.Context, in analyzeInput, db *sql.DB, visionModel m
 			Value:    food.Calories,
 		}, db)
 		if writeErr != nil {
-			// 写入失败不中断，记录继续
 			continue
 		}
 	}
@@ -129,4 +110,89 @@ func analyzeFood(ctx context.Context, in analyzeInput, db *sql.DB, visionModel m
 	}
 
 	return result, nil
+}
+
+// readImage loads image bytes from a local path or HTTP URL, with a 20MB size limit.
+func readImage(path string) ([]byte, string, error) {
+	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+		return readImageFromURL(path)
+	}
+	imgData, err := os.ReadFile(path)
+	if err != nil {
+		return nil, "", err
+	}
+	if len(imgData) > maxImageBytes {
+		return nil, "", fmt.Errorf("image too large: %d bytes (max %d)", len(imgData), maxImageBytes)
+	}
+	return imgData, mimeTypeFromExt(path), nil
+}
+
+func readImageFromURL(url string) ([]byte, string, error) {
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("download image: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("download image %s: HTTP %d", url, resp.StatusCode)
+	}
+
+	lr := io.LimitReader(resp.Body, maxImageBytes+1)
+	imgData, err := io.ReadAll(lr)
+	if err != nil {
+		return nil, "", fmt.Errorf("read image body: %w", err)
+	}
+	if len(imgData) > maxImageBytes {
+		return nil, "", fmt.Errorf("image too large: >%d bytes", maxImageBytes)
+	}
+
+	// infer MIME type from Content-Type header or URL extension
+	ct := resp.Header.Get("Content-Type")
+	if ct != "" {
+		return imgData, ct, nil
+	}
+	return imgData, mimeTypeFromExt(url), nil
+}
+
+func mimeTypeFromExt(path string) string {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".png":
+		return "image/png"
+	case ".webp":
+		return "image/webp"
+	case ".gif":
+		return "image/gif"
+	default:
+		return "image/jpeg"
+	}
+}
+
+// extractCodeFenceJSON strips markdown ```json ... ``` fences from model output.
+// Uses the same pattern as planner.go's extractPlanJSON but handles the edge case
+// where the closing ``` is on the same line as content.
+func extractCodeFenceJSON(content string) string {
+	s := strings.TrimSpace(content)
+
+	if !strings.HasPrefix(s, "```") {
+		return s
+	}
+
+	// 去掉首行 fence 标记（``` 或 ```json 等）
+	if nl := strings.IndexByte(s, '\n'); nl > 0 {
+		s = strings.TrimSpace(s[nl+1:])
+	} else {
+		return s // single line starting with ```, return as-is
+	}
+
+	// 去掉结尾的 ```
+	if idx := strings.LastIndex(s, "```"); idx >= 0 {
+		s = strings.TrimSpace(s[:idx])
+	}
+
+	return s
 }

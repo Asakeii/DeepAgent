@@ -33,6 +33,14 @@ func StartReminderTicker(db *sql.DB) (stop func()) {
 }
 
 func firePending(ctx context.Context, db *sql.DB, parser cron.Parser) {
+	// 先恢复卡在 firing 状态超过 5 分钟的记录（进程 crash 后残留）
+	_, err := db.ExecContext(ctx,
+		`UPDATE reminders SET status='pending'
+		 WHERE status='firing' AND next_fire_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)`)
+	if err != nil {
+		log.Printf("[reminder] recovery scan: %v", err)
+	}
+
 	rows, err := db.QueryContext(ctx,
 		`SELECT id, thread_id, cron, content FROM reminders
 		 WHERE status='pending' AND next_fire_at <= NOW()`)
@@ -69,20 +77,26 @@ func firePending(ctx context.Context, db *sql.DB, parser cron.Parser) {
 		sched, err := parser.Parse(cronExpr)
 		if err != nil {
 			// cron 解析失败，停用这条提醒
-			_, _ = db.ExecContext(ctx,
-				`UPDATE reminders SET status='broken' WHERE id=?`, id)
+			if _, uerr := db.ExecContext(ctx,
+				`UPDATE reminders SET status='broken' WHERE id=?`, id); uerr != nil {
+				log.Printf("[reminder] mark broken id=%d: %v", id, uerr)
+			}
 			log.Printf("[reminder] broken cron %q for id=%d: %v", cronExpr, id, err)
 			continue
 		}
 		nextFire := sched.Next(time.Now())
 		if nextFire.IsZero() {
-			_, _ = db.ExecContext(ctx,
-				`UPDATE reminders SET status='expired' WHERE id=?`, id)
+			if _, uerr := db.ExecContext(ctx,
+				`UPDATE reminders SET status='expired' WHERE id=?`, id); uerr != nil {
+				log.Printf("[reminder] mark expired id=%d: %v", id, uerr)
+			}
 			continue
 		}
-		_, _ = db.ExecContext(ctx,
+		if _, uerr := db.ExecContext(ctx,
 			`UPDATE reminders SET status='pending', next_fire_at=? WHERE id=?`,
-			nextFire, id)
+			nextFire, id); uerr != nil {
+			log.Printf("[reminder] reset pending id=%d: %v", id, uerr)
+		}
 	}
 
 	if err := rows.Err(); err != nil {

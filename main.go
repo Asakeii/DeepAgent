@@ -35,7 +35,8 @@ func main() {
 		log.Fatal(err)
 	}
 	// 启动无状态提醒 ticker（每分钟扫 MySQL 表，抢锁触发到期提醒）
-	_ = store.StartReminderTicker(infra.DB)
+	tickerStop := store.StartReminderTicker(infra.DB)
+	defer tickerStop()
 	if err := infra.InitModel(ctx); err != nil {
 		log.Fatal(err)
 	}
@@ -105,6 +106,9 @@ func runCLI(cfg *conf.Config) {
 	fmt.Println()
 }
 
+// runCheckin 保留作为独立调试入口（不与 Coordinator 图耦合）。
+// 正式路径是 Coordinator 自动路由：用户消息通过 runCLI/runServer 进入。
+// 需要手动测试 checkin agent 时设置 DEEPAGENT_MODE=checkin（需恢复 main 中的分支）。
 func runCheckin(cfg *conf.Config) {
 	ctx := context.Background()
 
@@ -166,7 +170,8 @@ func runCheckin(cfg *conf.Config) {
 
 func runServer() {
 	// 启动 MCP bridge（OpenClaw 通过此端口调用 deepAgent 工具）
-	srv.StartMCPServer(":8090")
+	// handle 保留供后续添加 graceful shutdown
+	_ = srv.StartMCPServer(":8090")
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/chat/stream", handler.ChatStreamEino)
