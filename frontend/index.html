@@ -248,17 +248,11 @@ async function send(){
             setStatus(j.agent==='human_feedback'?'':j.agent);setRing(j.agent==='checkin'?'coach':j.agent?'explore':'idle');
             if(j.agent!==lastAgent){showAgentCard(j.agent);lastAgent=j.agent}
           }
-          // Planner 阶段：流式展示 LLM 输出的原始 JSON（用户感知进度）
-          let plannerStream=(j.agent==='planner'||lastAgent==='planner')&&(j.message_chunks||(j.tool_call_chunks&&j.tool_call_chunks[0]));
-          if(plannerStream){
-            if(!st){st=true;removeMsg(tmpId)}
-            const txt=j.message_chunks||(j.tool_call_chunks?j.tool_call_chunks[0]?.args||'':'');
-            c+=txt;updateMsg(tmpId,'<div class="rounded-xl px-3 py-2 text-xs font-mono text-subtle" style="background:rgba(196,133,63,.04);border:1px solid rgba(196,133,63,.1);max-height:100px;overflow:hidden;white-space:pre-wrap">'+esc(c.slice(-400))+'</div>');
-            continue;
-          }
           if(!st){st=true;removeMsg(tmpId)}
           c+=j.content||'';
-          if(lastAgent==='reporter'){updateMsg(tmpId,'<div class="report-card rounded-2xl px-5 py-4 text-sm leading-relaxed">'+formatMd(c)+'</div>')}
+          // Planner: 代码风格卡片展示流式 JSON
+          if(lastAgent==='planner'){updateMsg(tmpId,'<div class="rounded-xl px-3 py-2 text-xs font-mono text-subtle leading-relaxed" style="background:rgba(196,133,63,.04);border:1px solid rgba(196,133,63,.1);max-height:120px;overflow-y:auto;white-space:pre-wrap;word-break:break-all">'+esc(c.slice(-500))+'</div>')}
+          else if(lastAgent==='reporter'){updateMsg(tmpId,'<div class="report-card rounded-2xl px-5 py-4 text-sm leading-relaxed">'+formatMd(c)+'</div>')}
           else{updateMsg(tmpId,esc(c))}
           if(j.agent==='planner'&&j.content)try{const p=JSON.parse(j.content);if(p.steps){steps=p.steps;renderSteps()}}catch(_){}
         }catch(_){}
@@ -310,26 +304,33 @@ function handleToolChunk(tc){
 }
 function handleToolResult(content){
   try{const r=JSON.parse(content);if(r.content){
-    const urls=extractURLs(JSON.stringify(r.content).slice(0,2000));
+    const urls=extractURLs(JSON.stringify(r.content).slice(0,3000));
     if(urls.length&&searchIdx){
       const id='sc-'+searchIdx;
-      const html=urls.map(u=>'<a href="'+u+'" target="_blank" class="text-muted hover:text-subtle text-[10px] truncate block max-w-[200px]">↗ '+u.replace(/^https?:\/\//,'').split('/')[0]+'</a>').join('');
-      updateSearchCard(id,searchCards[id]?.query||'搜索完成','<div class="mt-1 opacity-50">'+html+'</div>');
-      setTimeout(()=>{const el=document.getElementById(id);if(el){el.style.opacity='0';el.style.transform='translateX(-20px)';setTimeout(()=>el.remove(),500)}},5000);
+      urls.forEach((u,i)=>{setTimeout(()=>{showSearchURL(id,u,i)},i*200)});
     }
   }}catch(_){}
 }
-function extractURLs(s){const m=s.match(/https?:\/\/[^\s",}]+/g);return m?[...new Set(m)].slice(0,4):[]}
+function showSearchURL(id,url,idx){
+  const el=document.getElementById(id);if(!el)return;
+  const domain=url.replace(/^https?:\/\//,'').split('/')[0];
+  const d=document.createElement('div');
+  d.className='transition-all duration-500';
+  d.style.cssText='opacity:0;transform:translateY(4px);animation:float-in .4s ease both;animation-delay:'+(idx*.15)+'s';
+  d.innerHTML='<div class="flex items-center gap-1.5 text-[10px] text-subtle"><span class="w-1 h-1 rounded-full" style="background:#7A9A7E"></span>'+domain+'</div>';
+  el.querySelector('.search-urls').appendChild(d);
+}
+function extractURLs(s){const m=s.match(/https?:\/\/[^\s",}]+/g);return m?[...new Set(m)].slice(0,5):[]}
 function showSearchCard(id,title,detail){
   const c=document.getElementById('msg-container');
   const d=document.createElement('div');
   d.className='agent-card flex justify-start';
-  d.innerHTML='<div class="rounded-xl px-3 py-2 text-xs transition-all duration-700" style="background:rgba(122,154,126,.06);border:1px solid rgba(122,154,126,.15)"><span class="text-subtle">'+title+'</span>'+detail+'</div>';
+  d.innerHTML='<div class="rounded-xl px-3 py-2 text-xs transition-all duration-500" style="background:rgba(122,154,126,.06);border:1px solid rgba(122,154,126,.15)"><div class="flex items-center gap-2"><span class="dot w-2 h-2 rounded-full" style="background:#7A9A7E"></span><span class="text-subtle">'+title+'</span></div><div class="search-urls ml-4 mt-1 space-y-0.5"></div></div>';
   d.id=id;c.appendChild(d);c.scrollTop=c.scrollHeight;
 }
 function updateSearchCard(id,title,detail){
   const el=document.getElementById(id);if(!el)return;
-  el.querySelector('.rounded-xl').innerHTML='<span class="text-subtle">'+title+'</span>'+detail;
+  el.querySelector('.text-subtle').textContent=title;
 }
 function showAgentCard(agent){
   // 将之前的卡片标记为完成
