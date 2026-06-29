@@ -11,24 +11,20 @@
   @keyframes pulse-amber{0%,100%{box-shadow:0 0 0 0 rgba(196,133,63,.3)}50%{box-shadow:0 0 0 8px rgba(196,133,63,0)}}
   @keyframes slide-in{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
   @keyframes fade-up{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-  @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
   .font-display{font-family:'Playfair Display',serif}.font-body{font-family:'Inter',sans-serif}
   .ring-idle{box-shadow:0 0 0 1.5px rgba(45,42,38,.06)}
   .ring-coach{animation:pulse-green 2s ease-in-out infinite;box-shadow:0 0 0 2px #7A9A7E}
   .ring-explore{animation:pulse-amber 2.5s ease-in-out infinite;box-shadow:0 0 0 2px #C4853F}
   .msg-in{animation:fade-up .25s ease-out}
-  .panel{animation:slide-in .3s ease-out}
+  .panel-in{animation:slide-in .25s ease-out}
   .scrollbar::-webkit-scrollbar{width:3px}.scrollbar::-webkit-scrollbar-thumb{background:rgba(0,0,0,.06);border-radius:2px}
   .bg-page{background-color:#FBFAF8}.bg-surface{background-color:#F4F2EE}.bg-hover{background-color:#EFECE7}
-  .text-body{color:#2C2926}.text-muted{color:rgba(44,41,38,.35)}.text-subtle{color:rgba(44,41,38,.55)}
+  .text-body{color:#2C2926}.text-muted{color:rgba(44,41,38,.3)}.text-subtle{color:rgba(44,41,38,.5)}
   .border-hairline{border-color:rgba(44,41,38,.06)}
-  .badge-coach{background:rgba(122,154,126,.1);color:#5C7A60}
-  .badge-explore{background:rgba(196,133,63,.1);color:#A06530}
   @media(prefers-color-scheme:dark){
     .bg-page{background-color:#1C1A18}.bg-surface{background-color:#242220}.bg-hover{background-color:#2C2926}
     .text-body{color:#E8E3DE}.text-muted{color:rgba(232,227,222,.3)}.text-subtle{color:rgba(232,227,222,.45)}
     .border-hairline{border-color:rgba(232,227,222,.06)}
-    .ring-idle{box-shadow:0 0 0 1.5px rgba(232,227,222,.08)}
   }
 </style>
 </head>
@@ -36,29 +32,20 @@
 
 <!-- Nav -->
 <nav class="flex items-center justify-between px-5 py-3 border-b border-hairline shrink-0">
-  <div class="flex items-center gap-2.5">
-    <button onclick="toggleSidebar()" class="hidden md:block text-muted hover:text-subtle transition-colors">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+  <span class="font-display text-lg font-bold tracking-tight">deepAgent</span>
+  <div class="flex items-center gap-3">
+    <span id="ring-dot" class="w-1.5 h-1.5 rounded-full bg-body/15 transition-colors duration-500"></span>
+    <button onclick="newChat()" class="text-xs text-subtle hover:text-body transition-colors">新对话</button>
+    <button id="btn-history" onclick="toggleHistory()" class="text-xs text-subtle hover:text-body transition-colors relative">
+      历史
+      <span id="history-count" class="hidden absolute -top-1 -right-3 w-3.5 h-3.5 rounded-full bg-body text-page text-[9px] flex items-center justify-center font-medium"></span>
     </button>
-    <span class="font-display text-lg font-bold tracking-tight">deepAgent</span>
-    <span id="ring-dot" class="w-1.5 h-1.5 rounded-full bg-text-body/15 transition-colors duration-500"></span>
   </div>
-  <button onclick="newChat()" class="text-xs text-subtle hover:text-body transition-colors">新对话</button>
 </nav>
 
 <div class="flex flex-1 overflow-hidden">
 
-  <!-- Sidebar -->
-  <aside id="sidebar" class="w-60 shrink-0 border-r border-hairline hidden md:flex flex-col bg-surface overflow-hidden">
-    <div class="flex-1 overflow-y-auto scrollbar p-2 space-y-0.5">
-      <div id="session-list" class="flex flex-col gap-0.5">
-        <div class="px-3 py-2 text-xs text-muted font-medium tracking-wide">历史对话</div>
-        <div id="sessions-empty" class="px-3 py-6 text-center text-xs text-muted">暂无对话记录</div>
-      </div>
-    </div>
-  </aside>
-
-  <!-- Chat -->
+  <!-- Chat center -->
   <main class="flex-1 flex flex-col min-w-0">
     <div id="msg-container" class="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-4 scrollbar">
       <div class="flex flex-col items-center justify-center h-full text-muted">
@@ -86,12 +73,23 @@
           </button>
         </div>
       </div>
-      <div class="text-xs text-muted mt-2 px-2">Enter 发送 · 后端自动识别意图并路由</div>
+      <div class="text-xs text-muted mt-2 px-2">Enter 发送 · 后端自动识别</div>
     </div>
   </main>
 
+  <!-- History Panel (right) -->
+  <aside id="history-panel" class="w-64 shrink-0 border-l border-hairline bg-surface flex flex-col hidden panel-in">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-hairline">
+      <h3 class="text-xs font-medium tracking-wide text-subtle">历史对话</h3>
+      <button onclick="toggleHistory()" class="text-muted hover:text-subtle text-xs">✕</button>
+    </div>
+    <div id="history-list" class="flex-1 overflow-y-auto scrollbar p-2 space-y-0.5">
+      <div class="px-3 py-6 text-center text-xs text-muted">加载中…</div>
+    </div>
+  </aside>
+
   <!-- Research Panel -->
-  <aside id="research-panel" class="w-64 sm:w-72 shrink-0 border-l border-hairline p-4 overflow-y-auto scrollbar hidden panel bg-surface">
+  <aside id="research-panel" class="w-64 sm:w-72 shrink-0 border-l border-hairline p-4 overflow-y-auto scrollbar hidden panel-in bg-surface">
     <div class="flex items-center justify-between mb-3">
       <h3 class="font-display text-sm font-bold">探索进度</h3>
       <button onclick="document.getElementById('research-panel').classList.add('hidden')" class="text-muted hover:text-subtle text-xs">✕</button>
@@ -102,47 +100,65 @@
 </div>
 
 <script>
-let threadId='web-'+Date.now(),steps=[],sessions=[];
+let threadId='web-'+Date.now(),steps=[],sessions=[],histOpen=false;
 
 function setRing(m){
   document.getElementById('ring').className='rounded-2xl transition-all duration-500 '+(m==='coach'?'ring-coach':m==='explore'?'ring-explore':'ring-idle');
-  document.getElementById('ring-dot').className='w-1.5 h-1.5 rounded-full transition-colors duration-500 '+(m==='coach'?'badge-coach':m==='explore'?'badge-explore':'bg-body/15');
+  document.getElementById('ring-dot').className='w-1.5 h-1.5 rounded-full transition-colors duration-500 '+(m==='coach'?'bg-[#7A9A7E]':m==='explore'?'bg-[#C4853F]':'bg-body/15');
 }
 
-function toggleSidebar(){document.getElementById('sidebar').classList.toggle('hidden')}
+async function toggleHistory(){
+  const panel=document.getElementById('history-panel');
+  histOpen=!histOpen;
+  panel.classList.toggle('hidden',!histOpen);
+  if(histOpen){await loadSessions()}
+}
 
 async function loadSessions(){
+  const list=document.getElementById('history-list');
   try{
-    const r=await fetch('/api/sessions?limit=30');sessions=await r.json();
-    const list=document.getElementById('session-list');
-    list.innerHTML='<div class="px-3 py-2 text-xs text-muted font-medium tracking-wide">历史对话</div>';
-    if(!sessions.length){list.innerHTML+='<div class="px-3 py-6 text-center text-xs text-muted">暂无对话记录</div>';return}
-    sessions.forEach(s=>{
-      const isActive=s.thread_id===threadId;
-      const title=(s.first_msg||'新对话').slice(0,18)+(s.first_msg&&s.first_msg.length>18?'…':'');
-      const d=document.createElement('div');
-      d.className='px-3 py-1.5 rounded-lg text-xs cursor-pointer transition-colors '+(isActive?'bg-hover text-body font-medium':'text-subtle hover:bg-hover');
-      d.innerHTML=`<div class="truncate">${escapeHtml(title)}</div>`;
-      d.onclick=()=>switchSession(s.thread_id);
-      list.appendChild(d);
-    })
-  }catch(_){}
+    const r=await fetch('/api/sessions?limit=30');
+    if(!r.ok)throw new Error(r.status);
+    sessions=await r.json();
+    const cnt=document.getElementById('history-count');
+    if(sessions.length){cnt.textContent=sessions.length;cnt.classList.remove('hidden')}else{cnt.classList.add('hidden')}
+    if(!sessions.length){list.innerHTML='<div class="px-3 py-6 text-center text-xs text-muted">暂无对话</div>';return}
+    list.innerHTML=sessions.map(s=>{
+      const isActive=s.ThreadID===threadId;
+      const title=(s.FirstMsg||'新对话').slice(0,16)+(s.FirstMsg&&s.FirstMsg.length>16?'…':'');
+      const time=formatTime(s.LastAt);
+      return '<div class="px-3 py-2 rounded-lg cursor-pointer transition-colors '+(isActive?'bg-hover':'hover:bg-hover')+'" onclick="switchSession(\''+s.ThreadID+'\')"><div class="text-xs truncate '+(isActive?'text-body font-medium':'text-subtle')+'">'+esc(title)+'</div><div class="text-[10px] text-muted mt-0.5">'+time+' · '+s.MsgCount+'条</div></div>';
+    }).join('');
+  }catch(e){list.innerHTML='<div class="px-3 py-6 text-center text-xs text-muted">加载失败</div>'}
+}
+
+function formatTime(t){
+  if(!t)return'';
+  const d=new Date(t),now=new Date(),diff=now-d;
+  if(diff<6e4)return'刚刚';
+  if(diff<36e5)return Math.floor(diff/6e4)+'分钟前';
+  if(diff<864e5)return Math.floor(diff/36e5)+'小时前';
+  return (d.getMonth()+1)+'/'+d.getDate();
 }
 
 async function switchSession(tid){
-  threadId=tid;document.getElementById('msg-container').innerHTML='';
-  steps=[];document.getElementById('research-panel').classList.add('hidden');
+  threadId=tid;steps=[];histOpen&&loadSessions();
+  document.getElementById('research-panel').classList.add('hidden');
+  const mc=document.getElementById('msg-container');
+  mc.innerHTML='';
   try{
-    const r=await fetch('/api/messages?thread_id='+tid);const msgs=await r.json();
-    msgs.forEach(m=>addMsg(m.role==='user'?'user':'assistant',m.content));
-  }catch(_){}
-  loadSessions();setRing('idle');
+    const r=await fetch('/api/messages?thread_id='+tid);
+    if(!r.ok)throw new Error(r.status);
+    const msgs=await r.json();
+    msgs.forEach(m=>addMsg(m.Role==='user'?'user':'assistant',m.Content));
+    mc.scrollTop=mc.scrollHeight;
+  }catch(e){mc.innerHTML='<div class="flex flex-col items-center justify-center h-full text-muted"><p class="text-sm">加载失败</p></div>'}
+  setRing('idle');
 }
 
 function newChat(){
   threadId='web-'+Date.now();
-  document.getElementById('msg-container').innerHTML='<div class="flex flex-col items-center justify-center h-full text-muted"><div class="font-display text-5xl mb-4 italic" style="font-weight:500">deepAgent</div><p class="text-sm mb-6">你的私人教练，亦是知识伙伴</p>'+
-    '<div class="flex flex-wrap justify-center gap-2 max-w-sm"><button onclick="quickSend(\'今天慢跑了五公里\')" class="px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-colors">晨跑归来</button><button onclick="quickSend(\'记录一下午餐\')" class="px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-colors">记录午餐</button><button onclick="quickSend(\'看看这周运动情况\')" class="px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-colors">本周回顾</button><button onclick="quickSend(\'帮我分析一下最近有哪些新出的 AI 编程工具\')" class="px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-colors">研究探索</button></div></div>';
+  document.getElementById('msg-container').innerHTML='<div class="flex flex-col items-center justify-center h-full text-muted"><div class="font-display text-5xl mb-4 italic" style="font-weight:500">deepAgent</div><p class="text-sm mb-6">你的私人教练，亦是知识伙伴</p><div class="flex flex-wrap justify-center gap-2 max-w-sm"><button onclick="quickSend(\'今天慢跑了五公里\')" class="px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-colors">晨跑归来</button><button onclick="quickSend(\'记录一下午餐\')" class="px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-colors">记录午餐</button><button onclick="quickSend(\'看看这周运动情况\')" class="px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-colors">本周回顾</button><button onclick="quickSend(\'帮我分析一下最近有哪些新出的 AI 编程工具\')" class="px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-colors">研究探索</button></div></div>';
   steps=[];document.getElementById('research-panel').classList.add('hidden');
   loadSessions();setRing('idle');
 }
@@ -170,7 +186,7 @@ async function send(){
         if(!l.startsWith('data:'))continue;
         try{const j=JSON.parse(l.slice(5).trim());
           if(j.content==='end'||j.content==='processed')continue;if(j.role==='tool')continue;
-          if(!st){removeMsg(tmpId);st=true}c+=j.content||'';updateMsg(tmpId,escapeHtml(c));
+          if(!st){removeMsg(tmpId);st=true}c+=j.content||'';updateMsg(tmpId,esc(c));
           if(j.agent==='checkin')setRing('coach');if(j.agent==='planner'||j.agent==='researcher')setRing('explore');
           if(j.agent==='planner'&&j.content)try{const p=JSON.parse(j.content);if(p.steps){steps=p.steps;renderSteps()}}catch(_){}
         }catch(_){}
@@ -178,7 +194,7 @@ async function send(){
     }
     if(!st){removeMsg(tmpId);addMsg('assistant','已收到')}
     loadSessions();
-  }catch(e){removeMsg(tmpId);addMsg('assistant','似乎断开了连接，请重试')}
+  }catch(e){removeMsg(tmpId);addMsg('assistant','连接中断，请重试')}
   setRing('idle');btn.disabled=false;
 }
 
@@ -187,7 +203,7 @@ function addMsg(role,content,id){
   const d=document.createElement('div');
   d.className='msg-in flex '+(role==='user'?'justify-end':'justify-start');
   if(role==='user'){
-    d.innerHTML='<div class="max-w-[80%] sm:max-w-[65%] bg-body text-page rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed">'+escapeHtml(content)+'</div>';
+    d.innerHTML='<div class="max-w-[80%] sm:max-w-[65%] bg-body text-page rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed">'+esc(content)+'</div>';
   }else{
     d.innerHTML='<div class="flex items-start gap-2 max-w-[92%] sm:max-w-[75%]"><div class="w-5 h-5 rounded-full bg-surface flex items-center justify-center shrink-0 mt-0.5 text-[10px] select-none">✦</div><div class="bg-surface rounded-2xl rounded-bl-md px-4 py-2.5 text-sm leading-relaxed">'+content+'</div></div>';
   }
@@ -201,7 +217,7 @@ function updateMsg(id,content){
   document.getElementById('msg-container').scrollTop=document.getElementById('msg-container').scrollHeight;
 }
 
-function handleInterrupt(){addMsg('assistant','<div class="space-y-2"><p class="text-xs text-subtle">已为你规划好研究路径，是否继续？</p><div class="flex gap-2"><button onclick="resume(\'accepted\')" class="px-3 py-1.5 badge-coach rounded-lg text-xs font-medium">开始探索</button><button onclick="resume(\'edit_plan\')" class="px-3 py-1.5 badge-explore rounded-lg text-xs font-medium">调整方向</button></div></div>')}
+function handleInterrupt(){addMsg('assistant','<div class="space-y-2"><p class="text-xs text-subtle">已为你规划好研究路径，是否继续？</p><div class="flex gap-2"><button onclick="resume(\'accepted\')" class="px-3 py-1.5 rounded-lg text-xs font-medium" style="background:rgba(122,154,126,.1);color:#5C7A60">开始探索</button><button onclick="resume(\'edit_plan\')" class="px-3 py-1.5 rounded-lg text-xs font-medium" style="background:rgba(196,133,63,.1);color:#A06530">调整方向</button></div></div>')}
 
 async function resume(fb){
   setRing('explore');const tmpId2='r-'+Math.random().toString(36).slice(2);
@@ -209,17 +225,17 @@ async function resume(fb){
   try{
     const resp=await fetch('/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[],interrupt_feedback:fb,thread_id:threadId})});
     const reader=resp.body.getReader();const d=new TextDecoder();let buf='',c='',st=false;
-    while(true){const{done,value}=await reader.read();if(done)break;buf+=d.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop()||'';for(const l of ls){if(!l.startsWith('data:'))continue;try{const j=JSON.parse(l.slice(5).trim());if(j.content==='end')continue;if(!st){removeMsg(tmpId2);st=true}c+=j.content||'';updateMsg(tmpId2,escapeHtml(c))}catch(_){}}}
+    while(true){const{done,value}=await reader.read();if(done)break;buf+=d.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop()||'';for(const l of ls){if(!l.startsWith('data:'))continue;try{const j=JSON.parse(l.slice(5).trim());if(j.content==='end')continue;if(!st){removeMsg(tmpId2);st=true}c+=j.content||'';updateMsg(tmpId2,esc(c))}catch(_){}}}
   }catch(e){removeMsg(tmpId2);addMsg('assistant','连接中断')}
   setRing('idle');
 }
 
 function renderSteps(){
   document.getElementById('research-panel').classList.remove('hidden');
-  document.getElementById('research-steps').innerHTML=steps.map((s,i)=>`<div class="flex items-start gap-2 p-2 rounded-lg ${s.execution_res?'badge-coach':'bg-surface'}"><span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5 ${s.execution_res?'bg-[#7A9A7E] text-white':'bg-body/10 text-muted'}">${s.execution_res?'✓':i+1}</span><div><div class="font-medium">${escapeHtml(s.title||'')}</div><div class="text-muted mt-0.5">${escapeHtml((s.description||'').slice(0,60))}</div></div></div>`).join('');
+  document.getElementById('research-steps').innerHTML=steps.map((s,i)=>`<div class="flex items-start gap-2 p-2 rounded-lg ${s.execution_res?'bg-[rgba(122,154,126,.1)]':'bg-surface'}"><span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5 ${s.execution_res?'bg-[#7A9A7E] text-white':'bg-body/10 text-muted'}">${s.execution_res?'✓':i+1}</span><div><div class="font-medium">${esc(s.title||'')}</div><div class="text-muted mt-0.5">${esc((s.description||'').slice(0,60))}</div></div></div>`).join('');
 }
 
-function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 loadSessions();
 </script>
 </body>
