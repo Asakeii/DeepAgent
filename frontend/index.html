@@ -1,278 +1,199 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="h-full">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>deepAgent — 你的自律教练</title>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>deepAgent</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  @keyframes breathe { 0%,100% { opacity:0.5; transform:scale(1) } 50% { opacity:1; transform:scale(1.06) } }
-  @keyframes pulse-ring { 0%,100% { box-shadow:0 0 0 0 rgba(122,154,126,0.4) } 50% { box-shadow:0 0 0 8px rgba(122,154,126,0) } }
-  @keyframes slide-in { from { transform:translateX(100%); opacity:0 } to { transform:translateX(0); opacity:1 } }
-  @keyframes fade-up { from { opacity:0; transform:translateY(12px) } to { opacity:1; transform:translateY(0) } }
-  .font-display { font-family:'Playfair Display',serif }
-  .font-body { font-family:'Inter',sans-serif }
-  .font-mono { font-family:'JetBrains Mono',monospace }
-  .ring-idle { box-shadow:0 0 0 2px rgba(45,42,38,0.1) }
-  .ring-checkin { animation:pulse-ring 2s ease-in-out infinite; box-shadow:0 0 0 3px #7A9A7E }
-  .ring-research { animation:pulse-ring 2.5s ease-in-out infinite; box-shadow:0 0 0 3px #C4853F }
-  .ring-diet { animation:pulse-ring 2s ease-in-out infinite; box-shadow:0 0 0 3px #D4956A }
-  .msg-card { animation:fade-up 0.3s ease-out }
-  .research-panel { animation:slide-in 0.35s ease-out }
-  .scrollbar-thin::-webkit-scrollbar { width:4px }
-  .scrollbar-thin::-webkit-scrollbar-thumb { background:rgba(0,0,0,0.1); border-radius:2px }
-  .bg-paper { background-color:#FAF8F5 }
-  .bg-oldpaper { background-color:#F2EFE9 }
-  .text-ink { color:#2D2A26 }
-  .border-subtle { border-color:rgba(45,42,38,0.08) }
-  .accent-green { color:#7A9A7E; border-color:#7A9A7E }
-  .accent-amber { color:#C4853F; border-color:#C4853F }
-  .accent-clay { color:#D4956A; border-color:#D4956A }
-  .bg-green-soft { background-color:rgba(122,154,126,0.08) }
-  .bg-amber-soft { background-color:rgba(196,133,63,0.08) }
-  .bg-clay-soft { background-color:rgba(212,149,106,0.08) }
+  @keyframes pulse-green{0%,100%{box-shadow:0 0 0 0 rgba(122,154,126,.35)}50%{box-shadow:0 0 0 10px rgba(122,154,126,0)}}
+  @keyframes pulse-amber{0%,100%{box-shadow:0 0 0 0 rgba(196,133,63,.35)}50%{box-shadow:0 0 0 10px rgba(196,133,63,0)}}
+  @keyframes slide-in{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+  @keyframes fade-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes dot-blink{0%,100%{opacity:1}50%{opacity:.3}}
+  .font-display{font-family:'Playfair Display',serif}.font-body{font-family:'Inter',sans-serif}
+  .ring-idle{box-shadow:0 0 0 1.5px rgba(45,42,38,.08)}
+  .ring-checkin{animation:pulse-green 2s ease-in-out infinite;box-shadow:0 0 0 2px #7A9A7E}
+  .ring-research{animation:pulse-amber 2.5s ease-in-out infinite;box-shadow:0 0 0 2px #C4853F}
+  .msg-card{animation:fade-up .25s ease-out}
+  .panel{animation:slide-in .3s ease-out}
+  .scrollbar::-webkit-scrollbar{width:4px}.scrollbar::-webkit-scrollbar-thumb{background:rgba(0,0,0,.08);border-radius:2px}
+  .bg-paper{background-color:#FAF8F5}.bg-card{background-color:#F2EFE9}
+  .text-ink{color:#2D2A26}.border-soft{border-color:rgba(45,42,38,.06)}
+  .bg-green-soft{background-color:rgba(122,154,126,.1)}.bg-amber-soft{background-color:rgba(196,133,63,.1)}
+  .bg-diet-soft{background-color:rgba(212,149,106,.1)}
+  .dot-green{background-color:#7A9A7E}.dot-amber{background-color:#C4853F}
+  @media(prefers-color-scheme:dark){
+    .bg-paper{background-color:#1E1C1A}.bg-card{background-color:#282624}
+    .text-ink{color:#E8E4DF}.border-soft{border-color:rgba(232,228,223,.06)}
+    .ring-idle{box-shadow:0 0 0 1.5px rgba(232,228,223,.08)}
+  }
 </style>
 </head>
-<body class="font-body bg-paper text-ink h-screen flex flex-col overflow-hidden">
+<body class="font-body bg-paper text-ink h-full flex flex-col overflow-hidden">
 
 <!-- Nav -->
-<nav class="flex items-center justify-between px-6 py-3 border-b border-subtle shrink-0">
-  <div class="flex items-center gap-2">
-    <span class="font-display text-xl font-bold tracking-tight">deepAgent</span>
-    <span class="text-xs text-ink/40 hidden sm:inline">自律教练</span>
+<nav class="flex items-center justify-between px-5 py-3 border-b border-soft shrink-0">
+  <div class="flex items-center gap-2.5">
+    <span class="font-display text-lg font-bold tracking-tight">deepAgent</span>
+    <span id="ring-dot" class="w-2 h-2 rounded-full bg-ink/20 transition-colors duration-500"></span>
+    <span id="agent-status" class="text-xs text-ink/30 hidden sm:inline">就绪</span>
   </div>
-  <div class="flex items-center gap-3">
-    <button onclick="newSession()" class="text-sm text-ink/60 hover:text-ink transition-colors">新对话</button>
-    <button class="w-7 h-7 rounded-full bg-oldpaper flex items-center justify-center text-sm">⚙</button>
+  <div class="flex items-center gap-3 text-sm">
+    <span id="session-name" class="text-ink/30 text-xs hidden sm:inline">新对话</span>
+    <button onclick="newSession()" class="text-ink/40 hover:text-ink/70 transition-colors">+</button>
   </div>
 </nav>
 
-<!-- Main layout -->
+<!-- Main -->
 <div class="flex flex-1 overflow-hidden">
 
-  <!-- Sidebar -->
-  <aside class="w-56 shrink-0 border-r border-subtle p-3 hidden md:flex flex-col gap-1 overflow-y-auto scrollbar-thin">
-    <div id="session-list" class="flex flex-col gap-1 text-sm">
-      <div class="px-2 py-1.5 rounded text-ink/60 text-xs font-medium">今日</div>
-      <div id="sessions-today" class="flex flex-col gap-0.5"></div>
-    </div>
-    <div class="mt-4 pt-3 border-t border-subtle">
-      <button onclick="toggleMode('checkin')" id="btn-checkin" class="w-full text-left px-3 py-2 rounded text-sm font-medium bg-green-soft accent-green transition-colors">
-        ○ 打卡模式
-      </button>
-      <button onclick="toggleMode('research')" id="btn-research" class="w-full text-left px-3 py-2 rounded text-sm mt-1 text-ink/50 hover:bg-oldpaper transition-colors">
-        ○ 研究模式
-      </button>
-    </div>
-  </aside>
-
-  <!-- Chat center -->
+  <!-- Chat -->
   <main class="flex-1 flex flex-col min-w-0">
-    <div id="msg-container" class="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-thin">
-      <div class="flex flex-col items-center justify-center h-full text-ink/30">
-        <div class="font-display text-4xl mb-3">deepAgent</div>
-        <p class="text-sm">输入消息，开始对话</p>
+    <div id="msg-container" class="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-3 scrollbar">
+      <div class="flex flex-col items-center justify-center h-full text-ink/20">
+        <div class="font-display text-4xl sm:text-5xl mb-4">deepAgent</div>
+        <p class="text-sm">记录打卡 · 识别饮食 · 深度研究 · 定时提醒</p>
+        <div class="flex flex-wrap justify-center gap-2 mt-6 max-w-md">
+          <button onclick="quickSend('今天跑步5km')" class="px-3 py-1.5 bg-card rounded-full text-xs text-ink/50 hover:text-ink/80 transition-colors">🏃 跑步5km</button>
+          <button onclick="quickSend('今天读了1小时书')" class="px-3 py-1.5 bg-card rounded-full text-xs text-ink/50 hover:text-ink/80 transition-colors">📚 读书1h</button>
+          <button onclick="quickSend('这周运动总结一下')" class="px-3 py-1.5 bg-card rounded-full text-xs text-ink/50 hover:text-ink/80 transition-colors">📊 本周总结</button>
+          <button onclick="quickSend('设置每天8点提醒我喝水')" class="px-3 py-1.5 bg-card rounded-full text-xs text-ink/50 hover:text-ink/80 transition-colors">⏰ 设置提醒</button>
+        </div>
       </div>
     </div>
 
-    <!-- Input area with breathing ring -->
-    <div class="px-4 pb-4 pt-2 border-t border-subtle">
-      <div id="ring" class="rounded-xl ring-idle transition-all duration-500">
-        <div class="flex items-end gap-2 bg-oldpaper rounded-xl p-2">
+    <!-- Input -->
+    <div class="px-4 sm:px-6 pb-4 pt-2">
+      <div id="ring" class="rounded-2xl ring-idle transition-all duration-500">
+        <div class="flex items-end gap-2 bg-card rounded-2xl p-2.5">
           <textarea id="input" rows="1" placeholder="记录打卡，或提出研究问题…"
-            class="flex-1 bg-transparent resize-none outline-none text-sm py-2 px-2 max-h-32 placeholder:text-ink/30"
-            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
-          <button onclick="send()" class="shrink-0 w-9 h-9 rounded-lg bg-ink text-white flex items-center justify-center hover:opacity-80 transition-opacity">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+            class="flex-1 bg-transparent resize-none outline-none text-sm py-1.5 px-1.5 max-h-32 placeholder:text-ink/20"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,128)+'px'"></textarea>
+          <button id="btn-send" onclick="send()" class="shrink-0 w-9 h-9 rounded-xl bg-ink text-white flex items-center justify-center hover:opacity-85 transition-opacity disabled:opacity-30">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
           </button>
         </div>
       </div>
-      <div class="flex items-center gap-4 mt-2 px-1 text-xs text-ink/30">
-        <span>Enter 发送</span>
-        <span>Shift+Enter 换行</span>
-        <span id="status" class="ml-auto">就绪</span>
-      </div>
+      <div class="text-xs text-ink/20 mt-2 px-2">Enter 发送 · Shift+Enter 换行 · 后端自动路由 打卡/研究</div>
     </div>
   </main>
 
-  <!-- Research panel -->
-  <aside id="research-panel" class="w-72 shrink-0 border-l border-subtle p-4 overflow-y-auto scrollbar-thin hidden research-panel">
-    <h3 class="font-display text-base font-bold mb-3">研究进度</h3>
-    <div id="research-steps" class="space-y-2 text-sm"></div>
+  <!-- Research Panel -->
+  <aside id="research-panel" class="w-64 sm:w-72 shrink-0 border-l border-soft p-4 overflow-y-auto scrollbar hidden panel">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-display text-sm font-bold">研究进度</h3>
+      <button onclick="document.getElementById('research-panel').classList.add('hidden')" class="text-ink/30 hover:text-ink/60 text-xs">✕</button>
+    </div>
+    <div id="research-steps" class="space-y-2 text-xs"></div>
   </aside>
 
 </div>
 
 <script>
-const MODE = { CHECKIN:'checkin', RESEARCH:'research' };
-let currentMode = MODE.CHECKIN;
-let threadId = 'web-'+Date.now();
-let researchSteps = [];
+let threadId='web-'+Date.now(), researchSteps=[], lastAgent='';
 
-function toggleMode(m) {
-  currentMode = m;
-  document.getElementById('btn-checkin').className = m===MODE.CHECKIN
-    ? 'w-full text-left px-3 py-2 rounded text-sm font-medium bg-green-soft accent-green transition-colors'
-    : 'w-full text-left px-3 py-2 rounded text-sm mt-1 text-ink/50 hover:bg-oldpaper transition-colors';
-  document.getElementById('btn-research').className = m===MODE.RESEARCH
-    ? 'w-full text-left px-3 py-2 rounded text-sm font-medium bg-amber-soft accent-amber transition-colors'
-    : 'w-full text-left px-3 py-2 rounded text-sm mt-1 text-ink/50 hover:bg-oldpaper transition-colors';
-  const ring = document.getElementById('ring');
-  ring.className = 'rounded-xl transition-all duration-500 '+(m===MODE.CHECKIN?'ring-checkin':m===MODE.RESEARCH?'ring-research':'ring-idle');
+function setRing(m){
+  const r=document.getElementById('ring'),d=document.getElementById('ring-dot'),s=document.getElementById('agent-status');
+  r.className='rounded-2xl transition-all duration-500 '+(m==='checkin'?'ring-checkin':m==='research'?'ring-research':'ring-idle');
+  d.className='w-2 h-2 rounded-full transition-colors duration-500 '+(m==='checkin'?'dot-green':m==='research'?'dot-amber':'bg-ink/20');
+  s.textContent=m==='checkin'?'打卡中':m==='research'?'研究中':'就绪';
+  lastAgent=m;
 }
 
-function setRing(mode) {
-  const ring = document.getElementById('ring');
-  ring.className = 'rounded-xl transition-all duration-500 '+
-    (mode==='checkin'?'ring-checkin':mode==='research'?'ring-research':mode==='diet'?'ring-diet':'ring-idle');
-}
-
-function newSession() {
-  threadId = 'web-'+Date.now();
-  const c = document.getElementById('msg-container');
-  c.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-ink/30"><div class="font-display text-4xl mb-3">deepAgent</div><p class="text-sm">新对话已开始</p></div>';
-  researchSteps = [];
-  document.getElementById('research-panel').classList.add('hidden');
-}
-
-async function send() {
-  const input = document.getElementById('input');
-  const text = input.value.trim();
-  if(!text) return;
-  input.value = '';
-  input.style.height = 'auto';
-  setRing(currentMode===MODE.CHECKIN?'checkin':'research');
-
-  addMsg('user', text);
-  addMsg('assistant', '<span class="inline-block w-2 h-4 bg-ink/20 rounded animate-pulse"></span>', true);
-
-  const resp = await fetch('/chat/stream', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({messages:[{role:'user',content:text}],auto_accepted_plan:currentMode===MODE.RESEARCH,thread_id:threadId})
-  });
-
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let content = '';
-  let streaming = false;
-
-  while(true) {
-    const {done,value} = await reader.read();
-    if(done) break;
-    buffer += decoder.decode(value,{stream:true});
-    const lines = buffer.split('\n');
-    buffer = lines.pop()||'';
-    for(const line of lines) {
-      if(!line.startsWith('data:')) { if(line.startsWith('event:')) { const ev=line.slice(7).trim(); if(ev==='interrupt') handleInterrupt(); } continue }
-      try {
-        const d = JSON.parse(line.slice(5).trim());
-        if(d.content==='end'||d.content==='processed') continue;
-        if(!streaming){ removeLastAssistant(); streaming=true }
-        content += d.content||'';
-        updateLastAssistant(content);
-        if(d.agent) setRing(d.agent==='checkin'?'checkin':d.agent==='researcher'||d.agent==='planner'?'research':'idle');
-        if(d.agent==='planner' && d.content) try {
-          const plan = JSON.parse(d.content);
-          if(plan.steps) { researchSteps=plan.steps; renderResearchSteps() }
-        } catch(_){}
-        if(d.agent==='researcher' && d.content) addResearchProgress(d.content);
-      } catch(_){}
-    }
-  }
-  if(!streaming && content) updateLastAssistant(content);
+function newSession(){
+  threadId='web-'+Date.now();
+  document.getElementById('msg-container').innerHTML='<div class="flex flex-col items-center justify-center h-full text-ink/20"><div class="font-display text-4xl sm:text-5xl mb-4">deepAgent</div><p class="text-sm">新对话已开始</p></div>';
+  researchSteps=[];document.getElementById('research-panel').classList.add('hidden');
+  document.getElementById('session-name').textContent='新对话';
   setRing('idle');
 }
 
-function addMsg(role,content,isTemp) {
-  const c = document.getElementById('msg-container');
-  if(c.querySelector('.flex.items-center.justify-center')) c.innerHTML='';
-  const d = document.createElement('div');
-  d.className = 'msg-card flex '+(role==='user'?'justify-end':'justify-start');
-  d.innerHTML = role==='user'
-    ? `<div class="max-w-[75%] bg-ink text-white rounded-2xl rounded-br-md px-4 py-2.5 text-sm">${escapeHtml(content)}</div>`
-    : `<div class="max-w-[85%] ${isTemp?'':'bg-oldpaper'} rounded-2xl rounded-bl-md px-4 py-2.5 text-sm"><div class="prose prose-sm">${content}</div></div>`;
-  d.id = isTemp ? 'temp-msg' : '';
-  c.appendChild(d);
-  c.scrollTop = c.scrollHeight;
-}
+function quickSend(t){document.getElementById('input').value=t;send()}
 
-function removeLastAssistant() {
-  const t = document.getElementById('temp-msg');
-  if(t) t.remove();
-}
-
-function updateLastAssistant(content) {
-  const c = document.getElementById('msg-container');
-  const last = c.lastElementChild;
-  if(last && last.querySelector('.prose')) {
-    last.querySelector('.prose').innerHTML = escapeHtml(content);
-  } else {
-    addMsg('assistant', content);
-  }
-  c.scrollTop = c.scrollHeight;
-}
-
-function handleInterrupt() {
-  addMsg('assistant', '<div class="flex gap-2"><button onclick="resume(\'accepted\')" class="px-3 py-1.5 bg-green-soft accent-green rounded-lg text-sm font-medium">✓ 开始执行</button><button onclick="resume(\'edit_plan\')" class="px-3 py-1.5 bg-amber-soft accent-amber rounded-lg text-sm font-medium">✎ 编辑计划</button></div>');
-}
-
-async function resume(feedback) {
-  const resp = await fetch('/chat/stream', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({messages:[],interrupt_feedback:feedback,thread_id:threadId})
-  });
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '', content = '';
+async function send(){
+  const input=document.getElementById('input'),btn=document.getElementById('btn-send');
+  const text=input.value.trim();if(!text)return;
+  input.value='';input.style.height='auto';btn.disabled=true;
   setRing('research');
-  while(true) {
-    const {done,value} = await reader.read();
-    if(done) break;
-    buffer += decoder.decode(value,{stream:true});
-    const lines = buffer.split('\n');
-    buffer = lines.pop()||'';
-    for(const line of lines) {
-      if(!line.startsWith('data:')) continue;
-      try {
-        const d = JSON.parse(line.slice(5).trim());
-        if(d.content==='end'||d.content==='processed') continue;
-        content += d.content||'';
-        updateLastAssistant(content);
-      } catch(_){}
+
+  const empty=document.getElementById('msg-container').querySelector('.flex.items-center.justify-center');
+  if(empty)empty.remove();
+
+  addMsg('user',text);
+  const tmpId='tmp-'+Date.now();
+  addMsg('assistant','<div class="flex gap-1.5 items-center h-4"><span class="w-1.5 h-1.5 bg-ink/20 rounded-full animate-bounce"></span><span class="w-1.5 h-1.5 bg-ink/20 rounded-full animate-bounce" style="animation-delay:.1s"></span><span class="w-1.5 h-1.5 bg-ink/20 rounded-full animate-bounce" style="animation-delay:.2s"></span></div>',tmpId);
+
+  try{
+    const resp=await fetch('/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'user',content:text}],auto_accepted_plan:true,thread_id:threadId})});
+    const reader=resp.body.getReader();const d=new TextDecoder();
+    let buf='',content='',streamed=false;
+
+    while(true){const{done,value}=await reader.read();if(done)break;buf+=d.decode(value,{stream:true});
+      const ls=buf.split('\n');buf=ls.pop()||'';
+      for(const l of ls){
+        if(l.startsWith('event:interrupt')){handleInterrupt();continue}
+        if(!l.startsWith('data:'))continue;
+        try{const j=JSON.parse(l.slice(5).trim());
+          if(j.content==='end'||j.content==='processed')continue;if(j.role==='tool')continue;
+          if(!streamed){removeMsg(tmpId);streamed=true}content+=j.content||'';updateMsg(tmpId,escapeHtml(content));
+          if(j.agent==='checkin')setRing('checkin');if(j.agent==='planner'||j.agent==='researcher')setRing('research');
+          if(j.agent==='planner'&&j.content)try{const p=JSON.parse(j.content);if(p.steps){researchSteps=p.steps;renderSteps()}}catch(_){}
+        }catch(_){}
+      }
     }
+    if(!streamed){removeMsg(tmpId);addMsg('assistant','已处理')}
+    if(content)document.getElementById('session-name').textContent=text.slice(0,20)+(text.length>20?'…':'');
+  }catch(e){
+    removeMsg(tmpId);addMsg('assistant','网络错误，请重试');
   }
-  setRing('idle');
+  setRing('idle');btn.disabled=false;
 }
 
-function renderResearchSteps() {
-  const panel = document.getElementById('research-panel');
-  panel.classList.remove('hidden');
-  const steps = document.getElementById('research-steps');
-  steps.innerHTML = researchSteps.map((s,i)=>`<div class="flex items-start gap-2 p-2 rounded ${s.execution_res?'bg-green-soft':'bg-oldpaper'}"><span class="w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 mt-0.5 ${s.execution_res?'bg-[#7A9A7E] text-white':'bg-ink/10 text-ink/50'}">${s.execution_res?'✓':i+1}</span><div><div class="font-medium text-xs">${escapeHtml(s.title||'')}</div><div class="text-xs text-ink/40 mt-0.5">${escapeHtml((s.description||'').slice(0,50))}</div></div></div>`).join('');
+function addMsg(role,content,id){
+  const c=document.getElementById('msg-container');
+  const d=document.createElement('div');
+  d.className='msg-card flex '+(role==='user'?'justify-end':'justify-start');
+  const isUser=role==='user';
+  d.innerHTML=isUser
+    ?`<div class="max-w-[80%] sm:max-w-[70%] bg-ink text-white rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed">${escapeHtml(content)}</div>`
+    :`<div class="flex items-start gap-2 max-w-[90%] sm:max-w-[80%]"><div class="w-5 h-5 rounded-full bg-card flex items-center justify-center shrink-0 mt-0.5"><span class="text-[10px]">🤖</span></div><div class="bg-card rounded-2xl rounded-bl-md px-4 py-2.5 text-sm leading-relaxed">${content}</div></div>`;
+  if(id)d.id=id;
+  c.appendChild(d);c.scrollTop=c.scrollHeight;
 }
 
-function addResearchProgress(content) {
-  const steps = document.getElementById('research-steps');
-  if(!steps) return;
-  const last = steps.lastElementChild;
-  if(last && !last.classList.contains('bg-green-soft')) {
-    last.classList.add('bg-green-soft');
-    const span = last.querySelector('span');
-    if(span){ span.className='w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 mt-0.5 bg-[#7A9A7E] text-white'; span.textContent='✓' }
-  }
+function removeMsg(id){const e=document.getElementById(id);if(e)e.remove()}
+function updateMsg(id,content){
+  const e=document.getElementById(id);if(!e)return;
+  const body=e.querySelector('.bg-card .text-sm, .bg-card');
+  if(body){const inner=body.querySelector('.leading-relaxed');if(inner)inner.innerHTML=content;else body.innerHTML=content}
+  const c=document.getElementById('msg-container');c.scrollTop=c.scrollHeight;
 }
 
-function escapeHtml(s) {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
+function handleInterrupt(){
+  addMsg('assistant','<div class="space-y-2"><p class="text-xs text-ink/50">计划已生成，是否开始执行？</p><div class="flex gap-2"><button onclick="resume(\'accepted\')" class="px-3 py-1.5 bg-green-soft text-green-700 rounded-lg text-xs font-medium">✓ 开始</button><button onclick="resume(\'edit_plan\')" class="px-3 py-1.5 bg-amber-soft text-amber-700 rounded-lg text-xs font-medium">✎ 编辑</button></div></div>');
 }
 
-// init
-toggleMode(MODE.CHECKIN);
+async function resume(fb){
+  setRing('research');const tmpId2='tmp-resume';
+  addMsg('assistant','<div class="flex gap-1.5 items-center h-4"><span class="w-1.5 h-1.5 bg-ink/20 rounded-full animate-bounce"></span><span class="w-1.5 h-1.5 bg-ink/20 rounded-full animate-bounce" style="animation-delay:.1s"></span><span class="w-1.5 h-1.5 bg-ink/20 rounded-full animate-bounce" style="animation-delay:.2s"></span></div>',tmpId2);
+  try{
+    const resp=await fetch('/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[],interrupt_feedback:fb,thread_id:threadId})});
+    const reader=resp.body.getReader();const d=new TextDecoder();
+    let buf='',content='',streamed=false;
+    while(true){const{done,value}=await reader.read();if(done)break;buf+=d.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop()||'';for(const l of ls){if(!l.startsWith('data:'))continue;try{const j=JSON.parse(l.slice(5).trim());if(j.content==='end')continue;if(!streamed){removeMsg(tmpId2);streamed=true}content+=j.content||'';updateMsg(tmpId2,escapeHtml(content))}catch(_){}}}
+    setRing('idle');
+  }catch(e){removeMsg(tmpId2);addMsg('assistant','网络错误')}
+}
+
+function renderSteps(){
+  const panel=document.getElementById('research-panel');panel.classList.remove('hidden');
+  document.getElementById('research-steps').innerHTML=researchSteps.map((s,i)=>`<div class="flex items-start gap-2 p-2 rounded-lg ${s.execution_res?'bg-green-soft':'bg-card'}"><span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5 ${s.execution_res?'bg-[#7A9A7E] text-white':'bg-ink/10 text-ink/40'}">${s.execution_res?'✓':i+1}</span><div><div class="font-medium">${escapeHtml(s.title||'')}</div><div class="text-ink/30 mt-0.5">${escapeHtml((s.description||'').slice(0,60))}</div></div></div>`).join('');
+}
+
+function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 </script>
 </body>
 </html>
