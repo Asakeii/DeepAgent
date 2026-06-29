@@ -40,12 +40,50 @@ type checkinInput struct {
 
 // AnalyzeFoodDirect 供 handler 直接调用，绕过 ReAct agent。
 func AnalyzeFoodDirect(ctx context.Context, imageB64, text, threadID string, db *sql.DB, visionModel model.ChatModel) (string, error) {
+	// 按当前时间判断餐别
+	category := mealCategory()
 	in := analyzeInput{ThreadID: threadID, ImagePath: imageB64}
-	result, err := analyzeFood(ctx, in, db, visionModel)
+	result, err := analyzeFoodWithCategory(ctx, in, db, visionModel, category)
 	if err != nil {
 		return "", err
 	}
-	return result.Summary + "\n\n" + formatFoodResult(result), nil
+	return fmt.Sprintf("已记录「%s」：\n%s", category, formatFoodResult(result)) + "\n\n如需修改，回复"修改: xxx"", nil
+}
+
+func mealCategory() string {
+	h := time.Now().Hour()
+	switch {
+	case h >= 5 && h < 10: return "早餐"
+	case h >= 10 && h < 14: return "午餐"
+	case h >= 14 && h < 17: return "下午茶"
+	case h >= 17 && h < 22: return "晚餐"
+	default: return "夜宵"
+	}
+}
+
+func analyzeFoodWithCategory(ctx context.Context, in analyzeInput, db *sql.DB, visionModel model.ChatModel, category string) (analyzeResult, error) {
+	// 临时替换 analyzeFood 里的硬编码 category——通过改 recordCheckin 的调用
+	// 最简单：先调 analyzeFood（会写 "diet"），再 UPDATE
+	result, err := analyzeFood(ctx, in, db, visionModel)
+	if err != nil {
+		return result, err
+	}
+	// 更新 category
+	_, _ = db.ExecContext(ctx, `UPDATE checkins SET category=? WHERE thread_id=? AND category='diet' AND content IN (`+placeholders(len(result.Foods))+`)`,
+		append([]any{category, in.ThreadID}, foodNames(result.Foods)...)...)
+	return result, nil
+}
+
+func foodNames(foods []foodItem) []any {
+	out := make([]any, len(foods))
+	for i, f := range foods { out[i] = f.Name }
+	return out
+}
+
+func placeholders(n int) string {
+	ps := make([]string, n)
+	for i := range ps { ps[i] = "?" }
+	return strings.Join(ps, ",")
 }
 
 func formatFoodResult(r analyzeResult) string {

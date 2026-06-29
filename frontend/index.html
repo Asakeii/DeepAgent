@@ -202,7 +202,7 @@ async function send(){
   const empty=document.getElementById('msg-container').querySelector('.flex.items-center.justify-center');
   if(empty)empty.innerHTML='';
 
-  addMsg('user',text||'📷 图片分析');
+  if(img){addMsgImg(img,text)}else{addMsg('user',text)}
   const tmpId='t-'+Math.random().toString(36).slice(2);
   addMsg('assistant','<div class="flex gap-1.5 items-center h-3"><span class="w-1.5 h-1.5 rounded-full" style="background:rgba(44,41,38,.2);animation:dot-pulse 1s ease-in-out infinite"></span><span class="w-1.5 h-1.5 rounded-full" style="background:rgba(44,41,38,.2);animation:dot-pulse 1s ease-in-out .15s infinite"></span><span class="w-1.5 h-1.5 rounded-full" style="background:rgba(44,41,38,.2);animation:dot-pulse 1s ease-in-out .3s infinite"></span></div>',tmpId);
 
@@ -243,6 +243,13 @@ function addMsg(role,content,id,idx){
   if(id)d.id=id;c.appendChild(d);c.scrollTop=c.scrollHeight;
 }
 
+function addMsgImg(img,text){
+  const c=document.getElementById('msg-container');
+  const d=document.createElement('div');
+  d.className='msg-in-user flex justify-end';
+  d.innerHTML='<div class="max-w-[80%] sm:max-w-[65%] msg-user rounded-2xl rounded-br-md px-3 py-2 text-sm leading-relaxed shadow-sm"><img src="'+img+'" class="max-h-48 rounded-lg mb-1.5"/>'+(text?'<div>'+esc(text)+'</div>':'')+'</div>';
+  c.appendChild(d);c.scrollTop=c.scrollHeight;
+}
 function removeMsg(id){const e=document.getElementById(id);if(e)e.remove()}
 function updateMsg(id,content){
   const e=document.getElementById(id);if(!e)return;
