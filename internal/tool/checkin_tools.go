@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/eino/components/model"
@@ -35,6 +36,25 @@ type checkinInput struct {
 	Category string  `json:"category" jsonschema:"required" jsonschema_description:"打卡分类: study/sport/diet/other"`
 	Content  string  `json:"content" jsonschema:"required" jsonschema_description:"打卡内容描述"`
 	Value    float64 `json:"value" jsonschema_description:"可选数值，如运动公里数、学习小时数"`
+}
+
+// AnalyzeFoodDirect 供 handler 直接调用，绕过 ReAct agent。
+func AnalyzeFoodDirect(ctx context.Context, imageB64, text, threadID string, db *sql.DB, visionModel model.ChatModel) (string, error) {
+	in := analyzeInput{ThreadID: threadID, ImagePath: imageB64}
+	result, err := analyzeFood(ctx, in, db, visionModel)
+	if err != nil {
+		return "", err
+	}
+	return result.Summary + "\n\n" + formatFoodResult(result), nil
+}
+
+func formatFoodResult(r analyzeResult) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("共识别 %d 种食物，总热量约 %.0f 千卡\n", len(r.Foods), r.TotalCalories))
+	for _, f := range r.Foods {
+		sb.WriteString(fmt.Sprintf("- %s %.0fg %.0f kcal\n", f.Name, f.Weight, f.Calories))
+	}
+	return sb.String()
 }
 
 type checkinOutput struct {

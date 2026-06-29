@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/schema"
 
 	"deepAgent/internal/agent"
 	"deepAgent/internal/consts"
@@ -34,17 +33,16 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 		req.InterruptFeedback = NormalizeInterruptFeedback(req.InterruptFeedback)
 	}
 
-	// 图片粘贴：构造多模态消息（Content 与 MultiContent 互斥）
+	// 图片粘贴：直接调用 VisionModel 分析，返回结果
 	if req.ImageBase64 != "" && len(req.Messages) > 0 {
-		last := req.Messages[len(req.Messages)-1]
-		if last.Role == schema.User {
-			txt := last.Content
-			last.Content = ""
-			last.UserInputMultiContent = append(last.UserInputMultiContent,
-				schema.MessageInputPart{Type: schema.ChatMessagePartTypeText, Text: txt},
-				schema.MessageInputPart{Type: schema.ChatMessagePartTypeImageURL,
-					Image: &schema.MessageInputImage{MessagePartCommon: schema.MessagePartCommon{URL: &req.ImageBase64}}})
+		txt := req.Messages[len(req.Messages)-1].Content
+		resp, cerr := agent.AnalyzeFoodImage(context.Background(), req.ImageBase64, txt, req.ThreadID)
+		if cerr != nil {
+			_ = sse.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "分析失败: " + cerr.Error()})
+		} else {
+			_ = sse.WriteEvent("message", &model.ChatResp{Role: "assistant", Content: resp})
 		}
+		return
 	}
 
 	// per-request Builder + genFunc（对齐 deer-go）：genFunc 在编译时创建 State，

@@ -114,6 +114,10 @@ func analyzeFood(ctx context.Context, in analyzeInput, db *sql.DB, visionModel m
 
 // readImage loads image bytes from a local path or HTTP URL, with a 20MB size limit.
 func readImage(path string) ([]byte, string, error) {
+	// data: URL — 直接解码 base64
+	if strings.HasPrefix(path, "data:") {
+		return readImageFromDataURL(path)
+	}
 	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
 		return readImageFromURL(path)
 	}
@@ -125,6 +129,33 @@ func readImage(path string) ([]byte, string, error) {
 		return nil, "", fmt.Errorf("image too large: %d bytes (max %d)", len(imgData), maxImageBytes)
 	}
 	return imgData, mimeTypeFromExt(path), nil
+}
+
+func readImageFromDataURL(dataURL string) ([]byte, string, error) {
+	// data:[<mediatype>][;base64],<data>
+	parts := strings.SplitN(dataURL, ",", 2)
+	if len(parts) != 2 {
+		return nil, "", fmt.Errorf("invalid data URL")
+	}
+	b64 := parts[1]
+	mimeType := "image/jpeg"
+	if idx := strings.Index(parts[0], ":"); idx >= 0 {
+		mt := parts[0][idx+1:]
+		if semi := strings.Index(mt, ";"); semi >= 0 {
+			mt = mt[:semi]
+		}
+		if mt != "" {
+			mimeType = mt
+		}
+	}
+	imgData, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil {
+		return nil, "", fmt.Errorf("decode data URL: %w", err)
+	}
+	if len(imgData) > maxImageBytes {
+		return nil, "", fmt.Errorf("image too large: %d bytes (max %d)", len(imgData), maxImageBytes)
+	}
+	return imgData, mimeType, nil
 }
 
 func readImageFromURL(url string) ([]byte, string, error) {

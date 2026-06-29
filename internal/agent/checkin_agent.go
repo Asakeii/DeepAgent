@@ -63,6 +63,11 @@ func RunCheckin(ctx context.Context, msgs []*schema.Message, threadID string) (*
 	return resp, nil
 }
 
+// AnalyzeFoodImage 直接调用 VisionModel 分析食物图片，不走 ReAct agent。
+func AnalyzeFoodImage(ctx context.Context, imageB64, text, threadID string) (string, error) {
+	return tool.AnalyzeFoodDirect(ctx, imageB64, text, threadID, infra.DB, infra.VisionModel)
+}
+
 // checkinMessageModifier 在每次模型调用前注入 system prompt。
 func checkinMessageModifier(ctx context.Context, msgs []*schema.Message) []*schema.Message {
 	sysPrompt, err := infra.GetPromptTemplate(ctx, "checkin_coach")
