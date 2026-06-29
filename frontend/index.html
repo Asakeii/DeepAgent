@@ -186,7 +186,7 @@ async function send(){
         if(!l.startsWith('data:'))continue;
         try{const j=JSON.parse(l.slice(5).trim());
           if(j.content==='end'||j.content==='processed')continue;if(j.role==='tool')continue;
-          if(!st){removeMsg(tmpId);st=true}c+=j.content||'';updateMsg(tmpId,esc(c));
+          if(!st){st=true}c+=j.content||'';updateMsg(tmpId,esc(c));
           if(j.agent==='checkin')setRing('coach');if(j.agent==='planner'||j.agent==='researcher')setRing('explore');
           if(j.agent==='planner'&&j.content)try{const p=JSON.parse(j.content);if(p.steps){steps=p.steps;renderSteps()}}catch(_){}
         }catch(_){}
@@ -213,7 +213,7 @@ function addMsg(role,content,id){
 function removeMsg(id){const e=document.getElementById(id);if(e)e.remove()}
 function updateMsg(id,content){
   const e=document.getElementById(id);if(!e)return;
-  const body=e.querySelector('.leading-relaxed');if(body)body.innerHTML=content;
+  const body=e.querySelector('.bg-surface');if(body)body.innerHTML='<div class="text-sm leading-relaxed">'+content+'</div>';
   document.getElementById('msg-container').scrollTop=document.getElementById('msg-container').scrollHeight;
 }
 
@@ -225,7 +225,7 @@ async function resume(fb){
   try{
     const resp=await fetch('/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[],interrupt_feedback:fb,thread_id:threadId})});
     const reader=resp.body.getReader();const d=new TextDecoder();let buf='',c='',st=false;
-    while(true){const{done,value}=await reader.read();if(done)break;buf+=d.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop()||'';for(const l of ls){if(!l.startsWith('data:'))continue;try{const j=JSON.parse(l.slice(5).trim());if(j.content==='end')continue;if(!st){removeMsg(tmpId2);st=true}c+=j.content||'';updateMsg(tmpId2,esc(c))}catch(_){}}}
+    while(true){const{done,value}=await reader.read();if(done)break;buf+=d.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop()||'';for(const l of ls){if(!l.startsWith('data:'))continue;try{const j=JSON.parse(l.slice(5).trim());if(j.content==='end')continue;if(!st){st=true}c+=j.content||'';updateMsg(tmpId2,esc(c))}catch(_){}}}
   }catch(e){removeMsg(tmpId2);addMsg('assistant','连接中断')}
   setRing('idle');
 }
