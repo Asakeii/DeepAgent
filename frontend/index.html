@@ -2,9 +2,10 @@
 <html lang="zh-CN" class="h-full">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>deepAgent</title>
+<title>日课 — 你的私人教练</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   @keyframes float-in{0%{opacity:0;transform:translateY(24px) scale(.96)}70%{opacity:1;transform:translateY(-3px) scale(1.01)}100%{opacity:1;transform:translateY(0) scale(1)}}
@@ -19,7 +20,7 @@
   @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
   @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
   @media(prefers-reduced-motion:reduce){*,::before,::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
-  .font-display{font-family:'Playfair Display',serif}.font-body{font-family:'Inter',sans-serif}
+  .font-display{font-family:'Noto Serif SC',serif}.font-body{font-family:'Inter',sans-serif}
   .ring-idle{box-shadow:0 0 0 1.5px rgba(44,41,38,.06)}
   .ring-coach{animation:ring-breathe 2.5s ease-in-out infinite}
   .ring-explore{animation:ring-explore 2.8s ease-in-out infinite}
@@ -36,6 +37,10 @@
   .msg-assistant{background:#F4F2EE;color:#2C2926;border:1px solid rgba(44,41,38,.06)}
   .btn-send:active{transform:scale(.92);transition:transform .1s ease}
   .chip:hover{animation:chip-lift .2s ease both}
+  .nav-btn{transition:all .2s cubic-bezier(.34,1.56,.64,1)}
+  .nav-btn:hover{transform:scale(1.08);color:#2C2926}
+  .history-item{transition:all .15s ease}
+  .history-item:hover{transform:translateX(3px)}
   @media(prefers-color-scheme:dark){
     .bg-page{background-color:#1C1A18}.bg-surface{background:#242220}.bg-hover{background:#2C2926}
     .text-body{color:#E8E3DE}.text-muted{color:rgba(232,227,222,.3)}.text-subtle{color:rgba(232,227,222,.45)}
@@ -49,11 +54,11 @@
 <body class="font-body bg-page text-body h-full flex flex-col overflow-hidden">
 
 <nav class="flex items-center justify-between px-5 py-3 border-b border-hairline shrink-0">
-  <span class="font-display text-lg font-bold tracking-tight float-in">deepAgent</span>
+  <a href="/" class="font-display text-lg font-bold tracking-tight float-in cursor-pointer hover:opacity-80 transition-opacity no-underline text-body">日课</a>
   <div class="flex items-center gap-4">
     <span id="status-text" class="text-xs text-subtle hidden sm:inline transition-all duration-300 float-in float-in-d1"></span>
-    <button onclick="newChat()" class="text-xs text-subtle hover:text-body transition-colors float-in float-in-d2">新对话</button>
-    <button id="btn-history" onclick="toggleHistory()" class="text-xs text-subtle hover:text-body transition-colors relative float-in float-in-d3">
+    <button onclick="newChat()" class="nav-btn text-xs text-subtle float-in float-in-d2">新对话</button>
+    <button id="btn-history" onclick="toggleHistory()" class="nav-btn text-xs text-subtle relative float-in float-in-d3">
       历史<span id="history-count" class="hidden absolute -top-1.5 -right-3 w-3.5 h-3.5 rounded-full bg-body text-page text-[9px] flex items-center justify-center font-medium"></span>
     </button>
   </div>
@@ -64,7 +69,7 @@
   <main class="flex-1 flex flex-col min-w-0">
     <div id="msg-container" class="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-4 scrollbar">
       <div class="flex flex-col items-center justify-center h-full">
-        <div class="font-display text-5xl mb-4 italic float-in" style="font-weight:500">deepAgent</div>
+        <div class="font-display text-5xl mb-4 italic float-in" style="font-weight:500">日课</div>
         <p class="text-sm text-muted mb-6 float-in float-in-d1">你的私人教练，亦是知识伙伴</p>
         <div class="flex flex-wrap justify-center gap-2 max-w-sm">
           <button onclick="quickSend('今天慢跑了五公里')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d1">晨跑归来</button>
@@ -161,7 +166,7 @@ async function loadSessions(){
     list.innerHTML=sessions.map(s=>{
       const isActive=s.ThreadID===threadId;
       const t=(s.FirstMsg||'新对话').slice(0,16)+(s.FirstMsg&&s.FirstMsg.length>16?'…':'');
-      return '<div class="px-3 py-2 rounded-lg cursor-pointer transition-all duration-150 '+(isActive?'bg-hover':'hover:bg-hover')+'" onclick="switchSession(\''+s.ThreadID+'\')"><div class="text-xs truncate '+(isActive?'text-body font-medium':'text-subtle')+'">'+esc(t)+'</div><div class="text-[10px] text-muted mt-0.5">'+fmtTime(s.LastAt)+' · '+s.MsgCount+'条</div></div>';
+      return '<div class="history-item px-3 py-2 rounded-lg cursor-pointer '+(isActive?'bg-hover':'hover:bg-hover')+'" onclick="switchSession(\''+s.ThreadID+'\')"><div class="text-xs truncate '+(isActive?'text-body font-medium':'text-subtle')+'">'+esc(t)+'</div><div class="text-[10px] text-muted mt-0.5">'+fmtTime(s.LastAt)+' · '+s.MsgCount+'条</div></div>';
     }).join('');
   }catch(e){list.innerHTML='<div class="px-3 py-6 text-center text-xs text-muted">加载失败</div>'}
 }
@@ -185,7 +190,7 @@ async function switchSession(tid){
 
 function newChat(){
   threadId='web-'+Date.now();steps=[];document.getElementById('research-panel').classList.add('hidden');
-  document.getElementById('msg-container').innerHTML='<div class="flex flex-col items-center justify-center h-full"><div class="font-display text-5xl mb-4 italic float-in" style="font-weight:500">deepAgent</div><p class="text-sm text-muted mb-6 float-in float-in-d1">你的私人教练，亦是知识伙伴</p><div class="flex flex-wrap justify-center gap-2 max-w-sm"><button onclick="quickSend(\'今天慢跑了五公里\')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d1">晨跑归来</button><button onclick="quickSend(\'记录一下午餐\')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d2">记录午餐</button><button onclick="quickSend(\'看看这周运动情况\')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d3">本周回顾</button><button onclick="quickSend(\'帮我分析一下最近有哪些新出的 AI 编程工具\')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d4">研究探索</button></div></div>';
+  document.getElementById('msg-container').innerHTML='<div class="flex flex-col items-center justify-center h-full"><div class="font-display text-5xl mb-4 italic float-in" style="font-weight:500">日课</div><p class="text-sm text-muted mb-6 float-in float-in-d1">你的私人教练，亦是知识伙伴</p><div class="flex flex-wrap justify-center gap-2 max-w-sm"><button onclick="quickSend(\'今天慢跑了五公里\')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d1">晨跑归来</button><button onclick="quickSend(\'记录一下午餐\')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d2">记录午餐</button><button onclick="quickSend(\'看看这周运动情况\')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d3">本周回顾</button><button onclick="quickSend(\'帮我分析一下最近有哪些新出的 AI 编程工具\')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d4">研究探索</button></div></div>';
   loadSessions();setRing('idle');setStatus('');
 }
 
