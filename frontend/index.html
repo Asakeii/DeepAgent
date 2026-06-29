@@ -79,6 +79,9 @@
   </div>
 </nav>
 
+<!-- Progress bar -->
+<div id="progress-bar" class="h-0.5 bg-surface shrink-0 hidden"><div id="progress-fill" class="h-full transition-all duration-700 ease-out" style="width:0%;background:#C4853F"></div></div>
+
 <div class="flex flex-1 overflow-hidden">
 
   <main class="flex-1 flex flex-col min-w-0">
@@ -129,6 +132,8 @@
 let threadId='web-'+Date.now(),steps=[],sessions=[],histOpen=false,sending=false,imageB64='';
 
 const AGENT_STATUS={coordinator:'思考意图…',planner:'规划步骤…',researcher:'搜索资料…',coder:'执行代码…',reporter:'撰写报告…',checkin:'记录打卡…',research_team:'调度任务…',human_feedback:'等待确认…'};
+const RESEARCH_PHASES=['coordinator','planner','researcher','reporter'];
+let phaseIdx=-1,phaseStart=0;
 
 function handlePaste(e){
   const items=e.clipboardData?.items;if(!items)return;
@@ -333,29 +338,35 @@ function updateSearchCard(id,title,detail){
   el.querySelector('.text-subtle').textContent=title;
 }
 function showAgentCard(agent){
-  // 将之前的卡片标记为完成
   agentCards.forEach(a=>{
     const el=document.getElementById('card-'+a);
-    if(el){el.querySelector('.dot').style.background='#7A9A7E';el.querySelector('.dot').classList.remove('dot');el.style.opacity='.5';el.style.transform='scale(.95)'}
+    if(el){const dot=el.querySelector('.dot');if(dot){dot.style.background='#7A9A7E';dot.classList.remove('dot')}el.style.opacity='.5';el.style.transform='scale(.95)'}
   });
-  agentCards.push(agent);
+  agentCards.push(agent);phaseStart=Date.now();
+  const pi=RESEARCH_PHASES.indexOf(agent);
+  if(pi>=0){phaseIdx=pi;const pct=Math.round(((pi+1)/RESEARCH_PHASES.length)*100);
+    const bar=document.getElementById('progress-bar');const fill=document.getElementById('progress-fill');
+    bar.classList.remove('hidden');fill.style.width=pct+'%';
+    if(agent==='reporter'){fill.style.background='#7A9A7E';setTimeout(()=>bar.classList.add('hidden'),2000)}
+  }
   const icons={coordinator:'🧭',planner:'📋',researcher:'🔍',coder:'💻',reporter:'📝',checkin:'🏃',research_team:'🔄',background_investigator:'🕵️',human_feedback:'👤'};
-  const labels={coordinator:'分析意图',planner:'制定计划',researcher:'搜索资料',coder:'执行代码',reporter:'整理报告',checkin:'记录打卡',research_team:'调度任务',background_investigator:'背景调查',human_feedback:'等待确认'};const subtext={planner:'AI 正在制定研究计划，需要 10-30 秒…',researcher:'正在搜索相关资料…',reporter:'正在整理研究报告…'};
+  const labels={coordinator:'分析意图',planner:'制定计划',researcher:'搜索资料',coder:'执行代码',reporter:'整理报告',checkin:'记录打卡',research_team:'调度任务',background_investigator:'背景调查',human_feedback:'等待确认'};
   const icon=icons[agent]||'⚡',label=labels[agent]||agent;
+  const idx=pi>=0?pi+1:'';
   const c=document.getElementById('msg-container');
   const d=document.createElement('div');
   d.className='agent-card flex justify-start';
-  d.innerHTML='<div class="rounded-xl px-3 py-2 text-xs transition-all duration-500" style="background:rgba(196,133,63,.08);border:1.5px solid rgba(196,133,63,.25);transform:scale(1.02);min-width:200px"><div class="flex items-center gap-2"><span class="dot w-2 h-2 rounded-full" style="background:#C4853F"></span><span style="color:#A06530">'+icon+' '+label+'</span></div>'+(subtext[agent]?'<div class="text-muted text-[10px] mt-1 ml-4">'+subtext[agent]+'</div>':'')+'</div>';
+  d.innerHTML='<div class="rounded-xl px-3 py-2 text-xs transition-all duration-500" style="background:rgba(196,133,63,.08);border:1.5px solid rgba(196,133,63,.25);transform:scale(1.02);min-width:180px"><div class="flex items-center gap-2"><span class="dot w-2 h-2 rounded-full" style="background:#C4853F"></span><span style="color:#A06530">'+(idx?'Step '+idx+'/4: ':'')+icon+' '+label+'</span></div>'+(agent==='planner'||agent==='researcher'?'<div class="text-muted text-[10px] mt-1 ml-4" id="timer-'+agent+'">刚刚开始…</div>':'')+'</div>';
   d.id='card-'+agent;
   c.appendChild(d);c.scrollTop=c.scrollHeight;
+  if(agent==='planner'||agent==='researcher'){
+    const timer=()=>{const el=document.getElementById('timer-'+agent);if(el){const s=Math.round((Date.now()-phaseStart)/1000);el.textContent='已等待 '+s+' 秒…'}};
+    timer();const iv=setInterval(timer,2000);
+    agentCards._iv=agentCards._iv||{};if(agentCards._iv[agent])clearInterval(agentCards._iv[agent]);
+    agentCards._iv[agent]=iv;
+  }
 }
-function removeMsg(id){const e=document.getElementById(id);if(e)e.remove()}
-function updateMsg(id,content){
-  const e=document.getElementById(id);if(!e)return;
-  const body=e.querySelector('.msg-assistant');if(!body)return;
-  body.innerHTML=content;
-  document.getElementById('msg-container').scrollTop=document.getElementById('msg-container').scrollHeight;
-}
+
 
 function handleInterrupt(){addMsg('assistant','<div class="space-y-2"><p class="text-xs text-subtle">已为你规划好研究路径，是否继续？</p><div class="flex gap-2"><button onclick="resume(\'accepted\')" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 hover:scale-105" style="background:rgba(122,154,126,.1);color:#5C7A60">开始探索</button><button onclick="resume(\'edit_plan\')" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 hover:scale-105" style="background:rgba(196,133,63,.1);color:#A06530">调整方向</button></div></div>')}
 
