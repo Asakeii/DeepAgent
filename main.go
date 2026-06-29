@@ -182,9 +182,11 @@ func runServer() {
 	mux.HandleFunc("/chat/stream", handler.ChatStreamEino)
 	mux.HandleFunc("/wechat/callback", handler.WechatCallback)
 	mux.HandleFunc("/v1/chat/completions", handler.OpenAICompatible)
+	// 前端静态文件
+	mux.Handle("/", http.FileServer(http.Dir("frontend")))
 
 	addr := ":8080"
-	log.Printf("deepAgent server listening on %s (wechat /wechat/callback, openai /v1/chat/completions)", addr)
+	log.Printf("deepAgent server listening on %s", addr)
 	if err := http.ListenAndServe(addr, withCORS(mux)); err != nil {
 		log.Fatal(err)
 	}

@@ -60,6 +60,7 @@ COPY internal/agent/ /app/internal/agent/
 COPY internal/tool/ /app/internal/tool/
 COPY internal/prompts/ /app/internal/prompts/
 COPY internal/store/schema.sql /app/internal/store/schema.sql
+COPY frontend/ /app/frontend/
 
 # 暴露 server 模式监听端口（DEEPAGENT_MODE=server 时 listen :8080）
 EXPOSE 8080
