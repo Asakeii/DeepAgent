@@ -17,6 +17,7 @@
   @keyframes chip-lift{0%{transform:translateY(0)}100%{transform:translateY(-2px)}}
   @keyframes dot-pulse{0%,100%{transform:scale(1);opacity:.4}50%{transform:scale(1.4);opacity:1}}
   @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+  @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
   @media(prefers-reduced-motion:reduce){*,::before,::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
   .font-display{font-family:'Playfair Display',serif}.font-body{font-family:'Inter',sans-serif}
   .ring-idle{box-shadow:0 0 0 1.5px rgba(44,41,38,.06)}
@@ -80,12 +81,13 @@
           <textarea id="input" rows="1" placeholder="记录今天的点滴，或提出你想了解的问题…"
             class="flex-1 bg-transparent resize-none outline-none text-sm py-1.5 px-1.5 max-h-32 placeholder:text-muted"
             onkeydown="handleKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,128)+'px'"></textarea>
-          <button id="btn-send" onclick="send()" class="btn-send shrink-0 w-9 h-9 rounded-xl bg-body text-page flex items-center justify-center hover:opacity-85 transition-all duration-200 disabled:opacity-25 disabled:scale-100">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+          <button id="btn-send" onclick="send()" class="btn-send shrink-0 w-9 h-9 rounded-xl bg-body text-page flex items-center justify-center hover:opacity-85 transition-all duration-300 disabled:opacity-60 disabled:scale-95">
+            <svg id="btn-send-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+            <svg id="btn-send-loading" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="hidden" style="animation:spin .8s linear infinite"><circle cx="12" cy="12" r="9" stroke-dasharray="42" stroke-dashoffset="10"/></svg>
           </button>
         </div>
       </div>
-      <div class="text-xs text-muted mt-2 px-2 transition-opacity duration-300">Enter 发送 · Shift+Enter 换行</div>
+      <div id="input-status" class="text-xs text-muted mt-2 px-2 transition-all duration-300 h-4">Enter 发送 · Shift+Enter 换行</div>
     </div>
   </main>
 
@@ -106,10 +108,16 @@ let threadId='web-'+Date.now(),steps=[],sessions=[],histOpen=false,sending=false
 
 const AGENT_STATUS={coordinator:'思考意图…',planner:'规划步骤…',researcher:'搜索资料…',coder:'执行代码…',reporter:'撰写报告…',checkin:'记录打卡…',research_team:'调度任务…',human_feedback:'等待确认…'};
 
+function setSending(v){
+  document.getElementById('btn-send-icon').classList.toggle('hidden',v);
+  document.getElementById('btn-send-loading').classList.toggle('hidden',!v);
+  document.getElementById('input-status').innerHTML=v?'<span class="text-subtle">处理中…</span>':'Enter 发送 · Shift+Enter 换行';
+}
 function setStatus(a){
   const s=document.getElementById('status-text');
   s.textContent=AGENT_STATUS[a]||a||'';
   s.className='text-xs hidden sm:inline transition-all duration-300 '+(a==='checkin'?'text-[#7A9A7E]':a==='planner'||a==='researcher'?'text-[#C4853F]':'text-subtle');
+  if(a)setSending(true);else setSending(false);
 }
 function setRing(m){
   document.getElementById('ring').className='rounded-2xl transition-all duration-700 '+(m==='coach'?'ring-coach':m==='explore'?'ring-explore':'ring-idle');
