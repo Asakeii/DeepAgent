@@ -194,7 +194,7 @@ function quickSend(t){document.getElementById('input').value=t;send()}
 async function send(){
   if(sending)return;
   const input=document.getElementById('input'),btn=document.getElementById('btn-send');
-  const text=input.value.trim();if(!text)return;
+  const text=input.value.trim();if(!text&&!img)return;
   input.value='';input.style.height='auto';sending=true;btn.disabled=true;
   const img=imageB64;imageB64='';clearImage();
   setRing('explore');setStatus('coordinator');

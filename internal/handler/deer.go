@@ -34,11 +34,14 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 		req.InterruptFeedback = NormalizeInterruptFeedback(req.InterruptFeedback)
 	}
 
-	// 图片粘贴：将 base64 图片附加到最后一条 user message 作为多模态内容
+	// 图片粘贴：构造多模态消息（Content 与 MultiContent 互斥）
 	if req.ImageBase64 != "" && len(req.Messages) > 0 {
 		last := req.Messages[len(req.Messages)-1]
 		if last.Role == schema.User {
+			txt := last.Content
+			last.Content = ""
 			last.UserInputMultiContent = append(last.UserInputMultiContent,
+				schema.MessageInputPart{Type: schema.ChatMessagePartTypeText, Text: txt},
 				schema.MessageInputPart{Type: schema.ChatMessagePartTypeImageURL,
 					Image: &schema.MessageInputImage{MessagePartCommon: schema.MessagePartCommon{URL: &req.ImageBase64}}})
 		}
