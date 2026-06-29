@@ -39,8 +39,8 @@ services:
       # 微信公众号 Token，用于回调 URL 签名验证。替换为你的真实 Token
       WECHAT_TOKEN: "your_wechat_token_here"
     ports:
-      # 宿主 8088 → 容器内 8080（避开本机 8080 被其他服务占用）
-      - "8088:8080"
+      # 宿主 8088 → 容器内 8741
+      - "8741:8741"
     volumes:
       # 真实配置（含 key、容器内 DSN）通过 volume 注入，不烤进镜像
       - ../conf/deep-agent.yaml:/app/conf/deep-agent.yaml:ro

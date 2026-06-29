@@ -126,16 +126,23 @@ func handleWechatMessage(w http.ResponseWriter, r *http.Request) {
 
 	initMsg := userMsg
 	initThreadID := threadID
-	opts := []compose.Option{
-		compose.WithStateModifier(func(ctx context.Context, path compose.NodePath, s any) error {
-			st := s.(*model.State)
-			st.Messages = []*schema.Message{schema.UserMessage(initMsg)}
-			st.ThreadID = initThreadID
-			return nil
-		}),
-	}
 
-	runnable := agent.GetAgent()
+	genFunc := func(ctx context.Context) *model.State {
+		return &model.State{
+			Messages:                      []*schema.Message{schema.UserMessage(initMsg)},
+			Goto:                          consts.Coordinator,
+			Locale:                        "zh-CN",
+			AutoAcceptedPlan:              true,
+			ThreadID:                      initThreadID,
+			EnableBackgroundInvestigation: false,
+		}
+	}
+	runnable, err := agent.Builder(r.Context(), genFunc)
+	if err != nil {
+		log.Printf("[wechat] build graph: %v", err)
+		writeWechatReply(w, msg, "系统繁忙，请稍后再试")
+		return
+	}
 
 	// collect stream output
 	var sb strings.Builder
@@ -150,10 +157,10 @@ func handleWechatMessage(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	_, err = runnable.Stream(r.Context(), consts.Coordinator,
-		append(opts, compose.WithCallbacks(&infra.LoggerCallback{
+		compose.WithCallbacks(&infra.LoggerCallback{
 			ID:  threadID,
 			Out: outChan,
-		}))...,
+		}),
 	)
 	close(outChan)
 	<-done
