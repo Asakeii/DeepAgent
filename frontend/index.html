@@ -22,6 +22,18 @@
   @keyframes card-in{0%{opacity:0;transform:translateY(8px) scale(.97)}100%{opacity:1;transform:translateY(0) scale(1)}}
   .agent-card{animation:card-in .3s cubic-bezier(.34,1.56,.64,1) both}
   .agent-card .dot{animation:dot-pulse 1.2s ease-in-out infinite}
+  .report-card{animation:float-in .5s cubic-bezier(.34,1.56,.64,1) both;border:1.5px solid rgba(196,133,63,.2);background:linear-gradient(135deg,rgba(196,133,63,.04),rgba(196,133,63,.01))}
+  .report-card h1,.report-card h2,.report-card h3{font-family:'Noto Serif SC',serif;font-weight:700;margin:1em 0 .4em;line-height:1.3}
+  .report-card h1{font-size:1.25rem}.report-card h2{font-size:1.05rem;color:#C4853F}.report-card h3{font-size:.9rem}
+  .report-card ul,.report-card ol{padding-left:1.2em;margin:.4em 0}.report-card li{margin:.2em 0}
+  .report-card table{width:100%;border-collapse:collapse;margin:.6em 0;font-size:.8rem}
+  .report-card th,.report-card td{border:1px solid rgba(44,41,38,.1);padding:.35em .5em;text-align:left}
+  .report-card th{background:rgba(196,133,63,.08);font-weight:600}
+  .report-card code{background:rgba(0,0,0,.05);padding:.1em .3em;border-radius:3px;font-size:.85em}
+  .report-card blockquote{border-left:3px solid #C4853F;margin:.5em 0;padding:.2em .8em;color:rgba(44,41,38,.6)}
+  .report-card hr{border:none;border-top:1px solid rgba(44,41,38,.08);margin:1em 0}
+  .report-card a{color:#C4853F;text-decoration:underline}
+  .report-card strong{font-weight:600}
   @media(prefers-reduced-motion:reduce){*,::before,::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
   .font-display{font-family:'Noto Serif SC',serif}.font-body{font-family:'Inter',sans-serif}
   .ring-idle{box-shadow:0 0 0 1.5px rgba(44,41,38,.06)}
@@ -227,9 +239,14 @@ async function send(){
         try{const j=JSON.parse(l.slice(5).trim());
           if(j.content==='end'||j.content==='processed')continue;if(j.role==='tool')continue;
           // agent 事件：展示进度卡片
-          if(j.agent){setStatus(j.agent==='human_feedback'?'':j.agent);setRing(j.agent==='checkin'?'coach':j.agent?'explore':'idle')}
-          if(!st){st=true;removeMsg(tmpId);showAgentCard(j.agent)}
-          c+=j.content||'';updateMsg(tmpId,esc(c));
+          if(j.agent){
+            setStatus(j.agent==='human_feedback'?'':j.agent);setRing(j.agent==='checkin'?'coach':j.agent?'explore':'idle');
+            if(j.agent!==lastAgent){showAgentCard(j.agent);lastAgent=j.agent}
+          }
+          if(!st){st=true;removeMsg(tmpId)}
+          c+=j.content||'';
+          if(lastAgent==='reporter'){updateMsg(tmpId,'<div class="report-card rounded-2xl px-5 py-4 text-sm leading-relaxed">'+formatMd(c)+'</div>')}
+          else{updateMsg(tmpId,esc(c))}
           if(j.agent==='planner'&&j.content)try{const p=JSON.parse(j.content);if(p.steps){steps=p.steps;renderSteps()}}catch(_){}
         }catch(_){}
       }
@@ -300,6 +317,16 @@ function renderSteps(){
 }
 
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+let lastAgent='',reportContent='';
+function formatMd(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^# (.+)$/gm,'<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`(.+?)`/g,'<code>$1</code>')
+    .replace(/^\- (.+)$/gm,'<li>$1</li>').replace(/(<li>.*<\/li>)/s,function(m){return'<ul>'+m+'</ul>'})
+    .replace(/\[(.+?)\]\((.+?)\)/g,'<a href="$2" target="_blank">$1</a>')
+    .replace(/^---$/gm,'<hr>').replace(/\n\n/g,'<br><br>');
+}
 document.addEventListener('paste',handlePaste);
 loadSessions();
 </script>
