@@ -14,6 +14,7 @@ type ChatRequest struct {
 	InterruptFeedback             string            `json:"interrupt_feedback,omitempty"`
 	MCPSettings                   map[string]any    `json:"mcp_settings,omitempty"`
 	EnableBackgroundInvestigation bool              `json:"enable_background_investigation,omitempty"`
+	ImageBase64                   string            `json:"image_base64,omitempty"`
 }
 
 type ToolResp struct {

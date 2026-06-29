@@ -33,6 +33,16 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 		req.InterruptFeedback = NormalizeInterruptFeedback(req.InterruptFeedback)
 	}
 
+	// 图片粘贴：将 base64 图片附加到最后一条 user message 作为多模态内容
+	if req.ImageBase64 != "" && len(req.Messages) > 0 {
+		last := req.Messages[len(req.Messages)-1]
+		if last.Role == schema.User {
+			last.MultiContent = append(last.MultiContent,
+				schema.ChatMessagePart{Type: schema.ChatMessagePartTypeImageURL,
+					ImageURL: &schema.ChatMessageImageURL{URL: req.ImageBase64}})
+		}
+	}
+
 	// per-request Builder + genFunc（对齐 deer-go）：genFunc 在编译时创建 State，
 	// sub-graph 节点通过 GenLocalState 继承正确的 Messages。
 	genFunc := func(ctx context.Context) *model.State {

@@ -77,17 +77,19 @@
 
     <div class="px-4 sm:px-8 pb-5 pt-2">
       <div id="ring" class="rounded-2xl ring-idle transition-all duration-700">
+        <div id="img-preview" class="hidden px-2.5 pt-2.5"><div class="relative inline-block"><img id="img-preview-src" class="max-h-32 rounded-lg shadow-sm" src=""><button onclick="clearImage()" class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-body text-page flex items-center justify-center text-[10px] hover:scale-110 transition-transform">✕</button></div></div>
         <div class="flex items-end gap-2 bg-surface rounded-2xl p-2.5 transition-all duration-200">
-          <textarea id="input" rows="1" placeholder="记录今天的点滴，或提出你想了解的问题…"
+          <textarea id="input" rows="1" placeholder="记录今天的点滴，或提出你想了解的问题…贴上图片可分析食物热量"
             class="flex-1 bg-transparent resize-none outline-none text-sm py-1.5 px-1.5 max-h-32 placeholder:text-muted"
-            onkeydown="handleKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,128)+'px'"></textarea>
+            onkeydown="handleKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,128)+'px'"
+            onpaste="handlePaste(event)"></textarea>
           <button id="btn-send" onclick="send()" class="btn-send shrink-0 w-9 h-9 rounded-xl bg-body text-page flex items-center justify-center hover:opacity-85 transition-all duration-300 disabled:opacity-60 disabled:scale-95">
             <svg id="btn-send-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
             <svg id="btn-send-loading" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="hidden" style="animation:spin .8s linear infinite"><circle cx="12" cy="12" r="9" stroke-dasharray="42" stroke-dashoffset="10"/></svg>
           </button>
         </div>
       </div>
-      <div id="input-status" class="text-xs text-muted mt-2 px-2 transition-all duration-300 h-4">Enter 发送 · Shift+Enter 换行</div>
+      <div id="input-status" class="text-xs text-muted mt-2 px-2 transition-all duration-300 h-4">Enter 发送 · Shift+Enter 换行 · 粘贴图片分析食物</div>
     </div>
   </main>
 
@@ -104,14 +106,30 @@
 </div>
 
 <script>
-let threadId='web-'+Date.now(),steps=[],sessions=[],histOpen=false,sending=false;
+let threadId='web-'+Date.now(),steps=[],sessions=[],histOpen=false,sending=false,imageB64='';
 
 const AGENT_STATUS={coordinator:'思考意图…',planner:'规划步骤…',researcher:'搜索资料…',coder:'执行代码…',reporter:'撰写报告…',checkin:'记录打卡…',research_team:'调度任务…',human_feedback:'等待确认…'};
+
+function handlePaste(e){
+  const items=e.clipboardData?.items;if(!items)return;
+  for(const item of items){
+    if(!item.type.startsWith('image/'))continue;
+    e.preventDefault();
+    const f=item.getAsFile();if(!f)continue;
+    const r=new FileReader();r.onload=()=>{imageB64=r.result;showPreview(r.result)};
+    r.readAsDataURL(f);return;
+  }
+}
+function showPreview(data){
+  document.getElementById('img-preview-src').src=data;
+  document.getElementById('img-preview').classList.remove('hidden');
+}
+function clearImage(){imageB64='';document.getElementById('img-preview').classList.add('hidden')}
 
 function setSending(v){
   document.getElementById('btn-send-icon').classList.toggle('hidden',v);
   document.getElementById('btn-send-loading').classList.toggle('hidden',!v);
-  document.getElementById('input-status').innerHTML=v?'<span class="text-subtle">处理中…</span>':'Enter 发送 · Shift+Enter 换行';
+  document.getElementById('input-status').innerHTML=v?'<span class="text-subtle">处理中…</span>':'Enter 发送 · Shift+Enter 换行 · 粘贴图片分析食物';
 }
 function setStatus(a){
   const s=document.getElementById('status-text');
@@ -178,6 +196,7 @@ async function send(){
   const input=document.getElementById('input'),btn=document.getElementById('btn-send');
   const text=input.value.trim();if(!text)return;
   input.value='';input.style.height='auto';sending=true;btn.disabled=true;
+  const img=imageB64;imageB64='';clearImage();
   setRing('explore');setStatus('coordinator');
 
   const empty=document.getElementById('msg-container').querySelector('.flex.items-center.justify-center');
@@ -188,7 +207,8 @@ async function send(){
   addMsg('assistant','<div class="flex gap-1.5 items-center h-3"><span class="w-1.5 h-1.5 rounded-full" style="background:rgba(44,41,38,.2);animation:dot-pulse 1s ease-in-out infinite"></span><span class="w-1.5 h-1.5 rounded-full" style="background:rgba(44,41,38,.2);animation:dot-pulse 1s ease-in-out .15s infinite"></span><span class="w-1.5 h-1.5 rounded-full" style="background:rgba(44,41,38,.2);animation:dot-pulse 1s ease-in-out .3s infinite"></span></div>',tmpId);
 
   try{
-    const resp=await fetch('/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'user',content:text}],auto_accepted_plan:true,thread_id:threadId})});
+    const body={messages:[{role:'user',content:text||'分析这张图片'}],auto_accepted_plan:true,thread_id:threadId};if(img)body.image_base64=img;
+    const resp=await fetch('/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const reader=resp.body.getReader();const d=new TextDecoder();let buf='',c='',st=false;
     while(true){const{done,value}=await reader.read();if(done)break;buf+=d.decode(value,{stream:true});
       const ls=buf.split('\n');buf=ls.pop()||'';
