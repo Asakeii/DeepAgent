@@ -4,27 +4,34 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>deepAgent</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   @keyframes pulse-green{0%,100%{box-shadow:0 0 0 0 rgba(122,154,126,.3)}50%{box-shadow:0 0 0 8px rgba(122,154,126,0)}}
   @keyframes pulse-amber{0%,100%{box-shadow:0 0 0 0 rgba(196,133,63,.3)}50%{box-shadow:0 0 0 8px rgba(196,133,63,0)}}
   @keyframes slide-in{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
   @keyframes fade-up{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes think-dot{0%,100%{opacity:.2;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
   .font-display{font-family:'Playfair Display',serif}.font-body{font-family:'Inter',sans-serif}
-  .ring-idle{box-shadow:0 0 0 1.5px rgba(45,42,38,.06)}
+  .ring-idle{box-shadow:0 0 0 1.5px rgba(44,41,38,.06)}
   .ring-coach{animation:pulse-green 2s ease-in-out infinite;box-shadow:0 0 0 2px #7A9A7E}
   .ring-explore{animation:pulse-amber 2.5s ease-in-out infinite;box-shadow:0 0 0 2px #C4853F}
   .msg-in{animation:fade-up .25s ease-out}
   .panel-in{animation:slide-in .25s ease-out}
+  .think .think-dot{animation:think-dot 1.2s ease-in-out infinite}
   .scrollbar::-webkit-scrollbar{width:3px}.scrollbar::-webkit-scrollbar-thumb{background:rgba(0,0,0,.06);border-radius:2px}
   .bg-page{background-color:#FBFAF8}.bg-surface{background-color:#F4F2EE}.bg-hover{background-color:#EFECE7}
   .text-body{color:#2C2926}.text-muted{color:rgba(44,41,38,.3)}.text-subtle{color:rgba(44,41,38,.5)}
   .border-hairline{border-color:rgba(44,41,38,.06)}
+  .msg-user{background-color:#2C2926;color:#FBFAF8}
+  .msg-assistant{background-color:#F4F2EE;color:#2C2926;border:1px solid rgba(44,41,38,.06)}
   @media(prefers-color-scheme:dark){
     .bg-page{background-color:#1C1A18}.bg-surface{background-color:#242220}.bg-hover{background-color:#2C2926}
     .text-body{color:#E8E3DE}.text-muted{color:rgba(232,227,222,.3)}.text-subtle{color:rgba(232,227,222,.45)}
     .border-hairline{border-color:rgba(232,227,222,.06)}
+    .msg-user{background-color:#E8E3DE;color:#1C1A18}
+    .msg-assistant{background-color:#242220;color:#E8E3DE;border-color:rgba(232,227,222,.06)}
+    .ring-idle{box-shadow:0 0 0 1.5px rgba(232,227,222,.08)}
   }
 </style>
 </head>
@@ -33,12 +40,11 @@
 <!-- Nav -->
 <nav class="flex items-center justify-between px-5 py-3 border-b border-hairline shrink-0">
   <span class="font-display text-lg font-bold tracking-tight">deepAgent</span>
-  <div class="flex items-center gap-3">
-    <span id="ring-dot" class="w-1.5 h-1.5 rounded-full bg-body/15 transition-colors duration-500"></span>
+  <div class="flex items-center gap-4">
+    <span id="status-text" class="text-xs text-subtle hidden sm:inline transition-colors duration-300">就绪</span>
     <button onclick="newChat()" class="text-xs text-subtle hover:text-body transition-colors">新对话</button>
     <button id="btn-history" onclick="toggleHistory()" class="text-xs text-subtle hover:text-body transition-colors relative">
-      历史
-      <span id="history-count" class="hidden absolute -top-1 -right-3 w-3.5 h-3.5 rounded-full bg-body text-page text-[9px] flex items-center justify-center font-medium"></span>
+      历史<span id="history-count" class="hidden absolute -top-1 -right-3 w-3.5 h-3.5 rounded-full bg-body text-page text-[9px] flex items-center justify-center font-medium"></span>
     </button>
   </div>
 </nav>
@@ -66,115 +72,103 @@
         <div class="flex items-end gap-2 bg-surface rounded-2xl p-2.5">
           <textarea id="input" rows="1" placeholder="记录今天的点滴，或提出你想了解的问题…"
             class="flex-1 bg-transparent resize-none outline-none text-sm py-1.5 px-1.5 max-h-32 placeholder:text-muted"
-            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
-            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,128)+'px'"></textarea>
+            onkeydown="handleKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,128)+'px'"></textarea>
           <button id="btn-send" onclick="send()" class="shrink-0 w-9 h-9 rounded-xl bg-body text-page flex items-center justify-center hover:opacity-85 transition-opacity disabled:opacity-25">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
           </button>
         </div>
       </div>
-      <div class="text-xs text-muted mt-2 px-2">Enter 发送 · 后端自动识别</div>
+      <div class="text-xs text-muted mt-2 px-2">Enter 发送 · Shift+Enter 换行</div>
     </div>
   </main>
 
-  <!-- History Panel (right) -->
+  <!-- History Panel -->
   <aside id="history-panel" class="w-64 shrink-0 border-l border-hairline bg-surface flex flex-col hidden panel-in">
-    <div class="flex items-center justify-between px-4 py-3 border-b border-hairline">
-      <h3 class="text-xs font-medium tracking-wide text-subtle">历史对话</h3>
-      <button onclick="toggleHistory()" class="text-muted hover:text-subtle text-xs">✕</button>
-    </div>
-    <div id="history-list" class="flex-1 overflow-y-auto scrollbar p-2 space-y-0.5">
-      <div class="px-3 py-6 text-center text-xs text-muted">加载中…</div>
-    </div>
+    <div class="flex items-center justify-between px-4 py-3 border-b border-hairline"><h3 class="text-xs font-medium tracking-wide text-subtle">历史对话</h3><button onclick="toggleHistory()" class="text-muted hover:text-subtle text-xs">✕</button></div>
+    <div id="history-list" class="flex-1 overflow-y-auto scrollbar p-2 space-y-0.5"><div class="px-3 py-6 text-center text-xs text-muted">加载中…</div></div>
   </aside>
 
   <!-- Research Panel -->
   <aside id="research-panel" class="w-64 sm:w-72 shrink-0 border-l border-hairline p-4 overflow-y-auto scrollbar hidden panel-in bg-surface">
-    <div class="flex items-center justify-between mb-3">
-      <h3 class="font-display text-sm font-bold">探索进度</h3>
-      <button onclick="document.getElementById('research-panel').classList.add('hidden')" class="text-muted hover:text-subtle text-xs">✕</button>
-    </div>
+    <div class="flex items-center justify-between mb-3"><h3 class="font-display text-sm font-bold">探索进度</h3><button onclick="document.getElementById('research-panel').classList.add('hidden')" class="text-muted hover:text-subtle text-xs">✕</button></div>
     <div id="research-steps" class="space-y-2 text-xs"></div>
   </aside>
 
 </div>
 
 <script>
-let threadId='web-'+Date.now(),steps=[],sessions=[],histOpen=false;
+let threadId='web-'+Date.now(),steps=[],sessions=[],histOpen=false,sending=false;
 
+const AGENT_STATUS={coordinator:'思考意图…',planner:'规划步骤…',researcher:'搜索资料…',coder:'执行代码…',reporter:'撰写报告…',checkin:'记录打卡…',research_team:'调度任务…',human_feedback:'等待确认…'};
+
+function setStatus(agent){
+  const s=document.getElementById('status-text');
+  s.textContent=AGENT_STATUS[agent]||agent||'就绪';
+  s.className='text-xs transition-colors duration-300 '+(agent==='checkin'?'text-[#7A9A7E]':agent==='planner'||agent==='researcher'?'text-[#C4853F]':'text-subtle');
+}
 function setRing(m){
   document.getElementById('ring').className='rounded-2xl transition-all duration-500 '+(m==='coach'?'ring-coach':m==='explore'?'ring-explore':'ring-idle');
-  document.getElementById('ring-dot').className='w-1.5 h-1.5 rounded-full transition-colors duration-500 '+(m==='coach'?'bg-[#7A9A7E]':m==='explore'?'bg-[#C4853F]':'bg-body/15');
 }
 
-async function toggleHistory(){
-  const panel=document.getElementById('history-panel');
-  histOpen=!histOpen;
-  panel.classList.toggle('hidden',!histOpen);
-  if(histOpen){await loadSessions()}
+function handleKey(e){
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(!sending)send()}
+}
+
+function toggleHistory(){
+  const p=document.getElementById('history-panel');
+  histOpen=!histOpen;p.classList.toggle('hidden',!histOpen);
+  if(histOpen)loadSessions()
 }
 
 async function loadSessions(){
   const list=document.getElementById('history-list');
   try{
-    const r=await fetch('/api/sessions?limit=30');
-    if(!r.ok)throw new Error(r.status);
-    sessions=await r.json();
+    const r=await fetch('/api/sessions?limit=30');if(!r.ok)throw new Error(r.status);sessions=await r.json();
     const cnt=document.getElementById('history-count');
     if(sessions.length){cnt.textContent=sessions.length;cnt.classList.remove('hidden')}else{cnt.classList.add('hidden')}
     if(!sessions.length){list.innerHTML='<div class="px-3 py-6 text-center text-xs text-muted">暂无对话</div>';return}
     list.innerHTML=sessions.map(s=>{
       const isActive=s.ThreadID===threadId;
-      const title=(s.FirstMsg||'新对话').slice(0,16)+(s.FirstMsg&&s.FirstMsg.length>16?'…':'');
-      const time=formatTime(s.LastAt);
-      return '<div class="px-3 py-2 rounded-lg cursor-pointer transition-colors '+(isActive?'bg-hover':'hover:bg-hover')+'" onclick="switchSession(\''+s.ThreadID+'\')"><div class="text-xs truncate '+(isActive?'text-body font-medium':'text-subtle')+'">'+esc(title)+'</div><div class="text-[10px] text-muted mt-0.5">'+time+' · '+s.MsgCount+'条</div></div>';
+      const t=(s.FirstMsg||'新对话').slice(0,16)+(s.FirstMsg&&s.FirstMsg.length>16?'…':'');
+      return '<div class="px-3 py-2 rounded-lg cursor-pointer transition-colors '+(isActive?'bg-hover':'hover:bg-hover')+'" onclick="switchSession(\''+s.ThreadID+'\')"><div class="text-xs truncate '+(isActive?'text-body font-medium':'text-subtle')+'">'+esc(t)+'</div><div class="text-[10px] text-muted mt-0.5">'+fmtTime(s.LastAt)+' · '+s.MsgCount+'条</div></div>';
     }).join('');
   }catch(e){list.innerHTML='<div class="px-3 py-6 text-center text-xs text-muted">加载失败</div>'}
 }
 
-function formatTime(t){
-  if(!t)return'';
-  const d=new Date(t),now=new Date(),diff=now-d;
-  if(diff<6e4)return'刚刚';
-  if(diff<36e5)return Math.floor(diff/6e4)+'分钟前';
-  if(diff<864e5)return Math.floor(diff/36e5)+'小时前';
-  return (d.getMonth()+1)+'/'+d.getDate();
+function fmtTime(t){
+  if(!t)return'';const d=new Date(t),n=new Date(),x=n-d;
+  if(x<6e4)return'刚刚';if(x<36e5)return Math.floor(x/6e4)+'分钟前';if(x<864e5)return Math.floor(x/36e5)+'小时前';
+  return(d.getMonth()+1)+'/'+d.getDate();
 }
 
 async function switchSession(tid){
   threadId=tid;steps=[];histOpen&&loadSessions();
   document.getElementById('research-panel').classList.add('hidden');
-  const mc=document.getElementById('msg-container');
-  mc.innerHTML='';
+  const mc=document.getElementById('msg-container');mc.innerHTML='';
   try{
-    const r=await fetch('/api/messages?thread_id='+tid);
-    if(!r.ok)throw new Error(r.status);
-    const msgs=await r.json();
-    msgs.forEach(m=>addMsg(m.Role==='user'?'user':'assistant',m.Content));
+    const r=await fetch('/api/messages?thread_id='+tid);if(!r.ok)throw new Error(r.status);
+    const msgs=await r.json();msgs.forEach(m=>addMsg(m.Role==='user'?'user':'assistant',m.Content));
     mc.scrollTop=mc.scrollHeight;
   }catch(e){mc.innerHTML='<div class="flex flex-col items-center justify-center h-full text-muted"><p class="text-sm">加载失败</p></div>'}
-  setRing('idle');
 }
 
-function newChat(){
-  threadId='web-'+Date.now();
-  document.getElementById('msg-container').innerHTML='<div class="flex flex-col items-center justify-center h-full text-muted"><div class="font-display text-5xl mb-4 italic" style="font-weight:500">deepAgent</div><p class="text-sm mb-6">你的私人教练，亦是知识伙伴</p><div class="flex flex-wrap justify-center gap-2 max-w-sm"><button onclick="quickSend(\'今天慢跑了五公里\')" class="px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-colors">晨跑归来</button><button onclick="quickSend(\'记录一下午餐\')" class="px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-colors">记录午餐</button><button onclick="quickSend(\'看看这周运动情况\')" class="px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-colors">本周回顾</button><button onclick="quickSend(\'帮我分析一下最近有哪些新出的 AI 编程工具\')" class="px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-colors">研究探索</button></div></div>';
-  steps=[];document.getElementById('research-panel').classList.add('hidden');
-  loadSessions();setRing('idle');
-}
+function newChat(){threadId='web-'+Date.now();document.getElementById('msg-container').innerHTML='<div class="flex flex-col items-center justify-center h-full text-muted"><div class="font-display text-5xl mb-4 italic" style="font-weight:500">deepAgent</div><p class="text-sm mb-6">你的私人教练，亦是知识伙伴</p><div class="flex flex-wrap justify-center gap-2 max-w-sm"><button onclick="quickSend(\'今天慢跑了五公里\')" class="px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-colors">晨跑归来</button><button onclick="quickSend(\'记录一下午餐\')" class="px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-colors">记录午餐</button><button onclick="quickSend(\'看看这周运动情况\')" class="px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-colors">本周回顾</button><button onclick="quickSend(\'帮我分析一下最近有哪些新出的 AI 编程工具\')" class="px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-colors">研究探索</button></div></div>';steps=[];document.getElementById('research-panel').classList.add('hidden');loadSessions();setRing('idle');setStatus('')}
 
 function quickSend(t){document.getElementById('input').value=t;send()}
 
 async function send(){
+  if(sending)return;
   const input=document.getElementById('input'),btn=document.getElementById('btn-send');
   const text=input.value.trim();if(!text)return;
-  input.value='';input.style.height='auto';btn.disabled=true;setRing('explore');
+  input.value='';input.style.height='auto';sending=true;btn.disabled=true;
+  setRing('explore');setStatus('coordinator');
 
   const empty=document.getElementById('msg-container').querySelector('.flex.items-center.justify-center');
   if(empty)empty.remove();
 
-  addMsg('user',text);const tmpId='t-'+Math.random().toString(36).slice(2);
-  addMsg('assistant','<div class="flex gap-1.5 items-center h-3"><span class="w-1.5 h-1.5 bg-body/15 rounded-full animate-bounce"></span><span class="w-1.5 h-1.5 bg-body/15 rounded-full animate-bounce" style="animation-delay:.1s"></span><span class="w-1.5 h-1.5 bg-body/15 rounded-full animate-bounce" style="animation-delay:.2s"></span></div>',tmpId);
+  addMsg('user',text);
+  const tmpId='t-'+Math.random().toString(36).slice(2);
+  addMsg('assistant','<div class="flex gap-1.5 items-center h-3 think"><span class="think-dot w-1.5 h-1.5 rounded-full bg-body/20"></span><span class="think-dot w-1.5 h-1.5 rounded-full bg-body/20" style="animation-delay:.15s"></span><span class="think-dot w-1.5 h-1.5 rounded-full bg-body/20" style="animation-delay:.3s"></span></div>',tmpId);
 
   try{
     const resp=await fetch('/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'user',content:text}],auto_accepted_plan:true,thread_id:threadId})});
@@ -187,7 +181,7 @@ async function send(){
         try{const j=JSON.parse(l.slice(5).trim());
           if(j.content==='end'||j.content==='processed')continue;if(j.role==='tool')continue;
           if(!st){st=true}c+=j.content||'';updateMsg(tmpId,esc(c));
-          if(j.agent==='checkin')setRing('coach');if(j.agent==='planner'||j.agent==='researcher')setRing('explore');
+          if(j.agent){const a=j.agent==='human_feedback'?null:j.agent;setStatus(a||'');setRing(a==='checkin'?'coach':a?'explore':'idle')}
           if(j.agent==='planner'&&j.content)try{const p=JSON.parse(j.content);if(p.steps){steps=p.steps;renderSteps()}}catch(_){}
         }catch(_){}
       }
@@ -195,7 +189,7 @@ async function send(){
     if(!st){removeMsg(tmpId);addMsg('assistant','已收到')}
     loadSessions();
   }catch(e){removeMsg(tmpId);addMsg('assistant','连接中断，请重试')}
-  setRing('idle');btn.disabled=false;
+  sending=false;btn.disabled=false;setRing('idle');setStatus('');
 }
 
 function addMsg(role,content,id){
@@ -203,9 +197,9 @@ function addMsg(role,content,id){
   const d=document.createElement('div');
   d.className='msg-in flex '+(role==='user'?'justify-end':'justify-start');
   if(role==='user'){
-    d.innerHTML='<div class="max-w-[80%] sm:max-w-[65%] bg-body text-page rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed">'+esc(content)+'</div>';
+    d.innerHTML='<div class="max-w-[80%] sm:max-w-[65%] msg-user rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed shadow-sm">'+esc(content)+'</div>';
   }else{
-    d.innerHTML='<div class="flex items-start gap-2 max-w-[92%] sm:max-w-[75%]"><div class="w-5 h-5 rounded-full bg-surface flex items-center justify-center shrink-0 mt-0.5 text-[10px] select-none">✦</div><div class="bg-surface rounded-2xl rounded-bl-md px-4 py-2.5 text-sm leading-relaxed">'+content+'</div></div>';
+    d.innerHTML='<div class="flex items-start gap-2 max-w-[92%] sm:max-w-[75%]"><div class="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold select-none" style="background:#2C2926;color:#FBFAF8">D</div><div class="msg-assistant rounded-2xl rounded-bl-md px-4 py-2.5 text-sm leading-relaxed shadow-sm">'+content+'</div></div>';
   }
   if(id)d.id=id;c.appendChild(d);c.scrollTop=c.scrollHeight;
 }
@@ -213,26 +207,29 @@ function addMsg(role,content,id){
 function removeMsg(id){const e=document.getElementById(id);if(e)e.remove()}
 function updateMsg(id,content){
   const e=document.getElementById(id);if(!e)return;
-  const body=e.querySelector('.bg-surface');if(body)body.innerHTML='<div class="text-sm leading-relaxed">'+content+'</div>';
+  const body=e.querySelector('.msg-assistant');if(!body)return;
+  body.innerHTML=content;
   document.getElementById('msg-container').scrollTop=document.getElementById('msg-container').scrollHeight;
 }
 
 function handleInterrupt(){addMsg('assistant','<div class="space-y-2"><p class="text-xs text-subtle">已为你规划好研究路径，是否继续？</p><div class="flex gap-2"><button onclick="resume(\'accepted\')" class="px-3 py-1.5 rounded-lg text-xs font-medium" style="background:rgba(122,154,126,.1);color:#5C7A60">开始探索</button><button onclick="resume(\'edit_plan\')" class="px-3 py-1.5 rounded-lg text-xs font-medium" style="background:rgba(196,133,63,.1);color:#A06530">调整方向</button></div></div>')}
 
 async function resume(fb){
-  setRing('explore');const tmpId2='r-'+Math.random().toString(36).slice(2);
-  addMsg('assistant','<div class="flex gap-1.5 items-center h-3"><span class="w-1.5 h-1.5 bg-body/15 rounded-full animate-bounce"></span><span class="w-1.5 h-1.5 bg-body/15 rounded-full animate-bounce" style="animation-delay:.1s"></span><span class="w-1.5 h-1.5 bg-body/15 rounded-full animate-bounce" style="animation-delay:.2s"></span></div>',tmpId2);
+  if(sending)return;sending=true;
+  setStatus('human_feedback');setRing('explore');
+  const tmpId2='r-'+Math.random().toString(36).slice(2);
+  addMsg('assistant','<div class="flex gap-1.5 items-center h-3 think"><span class="think-dot w-1.5 h-1.5 rounded-full bg-body/20"></span><span class="think-dot w-1.5 h-1.5 rounded-full bg-body/20" style="animation-delay:.15s"></span><span class="think-dot w-1.5 h-1.5 rounded-full bg-body/20" style="animation-delay:.3s"></span></div>',tmpId2);
   try{
     const resp=await fetch('/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[],interrupt_feedback:fb,thread_id:threadId})});
     const reader=resp.body.getReader();const d=new TextDecoder();let buf='',c='',st=false;
     while(true){const{done,value}=await reader.read();if(done)break;buf+=d.decode(value,{stream:true});const ls=buf.split('\n');buf=ls.pop()||'';for(const l of ls){if(!l.startsWith('data:'))continue;try{const j=JSON.parse(l.slice(5).trim());if(j.content==='end')continue;if(!st){st=true}c+=j.content||'';updateMsg(tmpId2,esc(c))}catch(_){}}}
   }catch(e){removeMsg(tmpId2);addMsg('assistant','连接中断')}
-  setRing('idle');
+  sending=false;setRing('idle');setStatus('');
 }
 
 function renderSteps(){
   document.getElementById('research-panel').classList.remove('hidden');
-  document.getElementById('research-steps').innerHTML=steps.map((s,i)=>`<div class="flex items-start gap-2 p-2 rounded-lg ${s.execution_res?'bg-[rgba(122,154,126,.1)]':'bg-surface'}"><span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5 ${s.execution_res?'bg-[#7A9A7E] text-white':'bg-body/10 text-muted'}">${s.execution_res?'✓':i+1}</span><div><div class="font-medium">${esc(s.title||'')}</div><div class="text-muted mt-0.5">${esc((s.description||'').slice(0,60))}</div></div></div>`).join('');
+  document.getElementById('research-steps').innerHTML=steps.map((s,i)=>`<div class="flex items-start gap-2 p-2 rounded-lg ${s.execution_res?'bg-[rgba(122,154,126,.1)]':''}"><span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5 ${s.execution_res?'bg-[#7A9A7E] text-white':'bg-body/10 text-muted'}">${s.execution_res?'✓':i+1}</span><div><div class="font-medium">${esc(s.title||'')}</div><div class="text-muted mt-0.5">${esc((s.description||'').slice(0,60))}</div></div></div>`).join('');
 }
 
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
