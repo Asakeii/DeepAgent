@@ -45,3 +45,8 @@ func RecentMessagesForCheckin(ctx context.Context, threadID string, limit int) (
 func AppendMessageForCheckin(ctx context.Context, threadID, role, content string) error {
 	return store.AppendMessage(ctx, DB, threadID, role, content)
 }
+
+// ListThreads 封装 store.ListThreads。
+func ListThreads(ctx context.Context, limit int) ([]store.ThreadInfo, error) {
+	return store.ListThreads(ctx, DB, limit)
+}

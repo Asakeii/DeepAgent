@@ -182,6 +182,8 @@ func runServer() {
 	mux.HandleFunc("/wechat/callback", handler.WechatCallback)
 	mux.HandleFunc("/v1/chat/completions", handler.OpenAICompatible)
 	// 前端静态文件
+	mux.HandleFunc("/api/sessions", handler.ListSessions)
+	mux.HandleFunc("/api/messages", handler.LoadMessages)
 	mux.Handle("/", http.FileServer(http.Dir("frontend")))
 
 	addr := ":8741"

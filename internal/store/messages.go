@@ -65,3 +65,34 @@ func RecentMessages(ctx context.Context, db *sql.DB, threadID string, limit int)
 	}
 	return out, nil
 }
+
+// ThreadInfo 会话摘要信息。
+type ThreadInfo struct {
+	ThreadID  string
+	FirstMsg  string // 第一条用户消息作为标题
+	LastAt    string // 最后消息时间
+	MsgCount  int
+}
+
+// ListThreads 返回所有 thread 的基本信息，按最近活动排序。
+func ListThreads(ctx context.Context, db *sql.DB, limit int) ([]ThreadInfo, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT thread_id, 
+		 (SELECT content FROM messages m2 WHERE m2.thread_id=m1.thread_id AND role='user' ORDER BY turn_idx ASC LIMIT 1) as first_msg,
+		 MAX(created_at) as last_at,
+		 COUNT(*) as msg_count
+		 FROM messages m1 GROUP BY thread_id ORDER BY last_at DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list threads: %w", err)
+	}
+	defer rows.Close()
+	var out []ThreadInfo
+	for rows.Next() {
+		var t ThreadInfo
+		if err := rows.Scan(&t.ThreadID, &t.FirstMsg, &t.LastAt, &t.MsgCount); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
