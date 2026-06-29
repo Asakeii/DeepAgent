@@ -18,7 +18,6 @@ import (
 	"deepAgent/internal/handler"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
-	srv "deepAgent/internal/server"
 	"deepAgent/internal/store"
 	"deepAgent/internal/tool"
 )
@@ -70,7 +69,6 @@ func runCLI(cfg *conf.Config) {
 	// 注入请求级 State
 	msg := schema.UserMessage(userPrompt)
 	threadID := os.Getenv("DEEPAGENT_THREAD_ID")
-	var routedToCheckin bool
 	opts := []compose.Option{
 		compose.WithStateModifier(func(ctx context.Context, path compose.NodePath, s any) error {
 			st := s.(*model.State)
@@ -79,7 +77,6 @@ func runCLI(cfg *conf.Config) {
 			st.MaxPlanIterations = cfg.Setting.MaxPlanIterations
 			st.MaxStepNum = cfg.Setting.MaxStepNum
 			st.ThreadID = threadID
-			routedToCheckin = st.RouteToCheckin
 			return nil
 		}),
 	}
@@ -105,7 +102,7 @@ func runCLI(cfg *conf.Config) {
 		log.Fatal(err)
 	}
 	// Coordinator 标记打卡路由时，切到 checkin agent
-	if routedToCheckin {
+	if _, ok := agent.CheckinThreads.LoadAndDelete(threadID); ok {
 		resp, cerr := agent.RunCheckin(context.Background(), []*schema.Message{msg}, threadID)
 		if cerr != nil {
 			log.Printf("[checkin] %v", cerr)
@@ -181,16 +178,13 @@ func runCheckin(cfg *conf.Config) {
 }
 
 func runServer() {
-	// 启动 MCP bridge（OpenClaw 通过此端口调用 deepAgent 工具）
-	// handle 保留供后续添加 graceful shutdown
-	_ = srv.StartMCPServer(":8090")
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/chat/stream", handler.ChatStreamEino)
 	mux.HandleFunc("/wechat/callback", handler.WechatCallback)
+	mux.HandleFunc("/v1/chat/completions", handler.OpenAICompatible)
 
 	addr := ":8080"
-	log.Printf("deepAgent server listening on %s (MCP on :8090, wechat on /wechat/callback)", addr)
+	log.Printf("deepAgent server listening on %s (wechat /wechat/callback, openai /v1/chat/completions)", addr)
 	if err := http.ListenAndServe(addr, withCORS(mux)); err != nil {
 		log.Fatal(err)
 	}
