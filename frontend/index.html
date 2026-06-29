@@ -65,7 +65,7 @@ function acard(ag){
   var ic=AGIC[ag]||'⚡',lb=AGLB[ag]||ag,n=acards.length;var stepLabel=(pi>0?'Step '+(pi)+'/3: ':'');
   var d=document.createElement('div');d.className='c-card c-card-in active';d.id='c-'+ag;
   d.style.top=(n-1)*8+'px';
-  d.innerHTML='<div class="rounded-xl px-3 py-2 text-xs" style="background:rgba(196,133,63,.08);border:1.5px solid rgba(196,133,63,.25);min-width:180px"><div class="flex items-center gap-2"><span class="dot w-2 h-2 rounded-full" style="background:#C4853F"></span><span style="color:#A06530">'+stepLabel+ic+' '+lb+'</span></div>'+((ag==='planner'||ag==='researcher')?'<div class="c-m text-[10px] mt-1 ml-4" id="tm-'+ag+'">刚刚开始…</div>':'')+'</div>';
+  d.innerHTML='<div class="rounded-xl px-3 py-2 text-xs" style="background:rgba(196,133,63,.08);border:1.5px solid rgba(196,133,63,.25);min-width:180px"><div class="flex items-center gap-2"><span class="dot w-2 h-2 rounded-full" style="background:#C4853F"></span><span style="color:#A06530">'+ic+' '+lb+'</span></div>'+((ag==='planner'||ag==='researcher')?'<div class="c-m text-[10px] mt-1 ml-4" id="tm-'+ag+'">刚刚开始…</div>':'')+'</div>';
   stack.appendChild(d);document.getElementById('mc').scrollTop=document.getElementById('mc').scrollHeight;
   if(ag==='planner'||ag==='researcher'){var tm=function(){var el=document.getElementById('tm-'+ag);if(el){el.textContent='已等待 '+Math.round((Date.now()-phaseS)/1000)+' 秒…'}};tm();var iv=setInterval(tm,2000);acards._iv=acards._iv||{};if(acards._iv[ag])clearInterval(acards._iv[ag]);acards._iv[ag]=iv}
 }
