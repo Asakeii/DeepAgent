@@ -22,6 +22,8 @@
   @keyframes card-in{0%{opacity:0;transform:translateY(8px) scale(.97)}100%{opacity:1;transform:translateY(0) scale(1)}}
   .agent-card{animation:card-in .3s cubic-bezier(.34,1.56,.64,1) both}
   .agent-card .dot{animation:dot-pulse 1.2s ease-in-out infinite}
+  .agent-card.active{z-index:10;transform:scale(1.02)}
+  .agent-card.done{z-index:5;opacity:.35;transform:scale(.92) translateY(-4px);filter:grayscale(.4)}
   .report-card{animation:float-in .5s cubic-bezier(.34,1.56,.64,1) both;border:1.5px solid rgba(196,133,63,.2);background:linear-gradient(135deg,rgba(196,133,63,.04),rgba(196,133,63,.01))}
   .report-card h1,.report-card h2,.report-card h3{font-family:'Noto Serif SC',serif;font-weight:700;margin:1em 0 .4em;line-height:1.3}
   .report-card h1{font-size:1.25rem}.report-card h2{font-size:1.05rem;color:#C4853F}.report-card h3{font-size:.9rem}
@@ -251,7 +253,7 @@ async function send(){
           // agent 事件：展示进度卡片
           if(j.agent){
             setStatus(j.agent==='human_feedback'?'':j.agent);setRing(j.agent==='checkin'?'coach':j.agent?'explore':'idle');
-            if(j.agent!==lastAgent){showAgentCard(j.agent);lastAgent=j.agent}
+            if(j.agent!==lastAgentif(j.agent!==lastAgent){showAgentCard(j.agent);lastAgent=j.agent}if(j.agent!==lastAgent){showAgentCard(j.agent);lastAgent=j.agent}j.agent!=='human_feedback'){showAgentCard(j.agent);lastAgent=j.agent}
           }
           if(!st){st=true;removeMsg(tmpId)}
           c+=j.content||'';
@@ -340,7 +342,7 @@ function updateSearchCard(id,title,detail){
 function showAgentCard(agent){
   agentCards.forEach(a=>{
     const el=document.getElementById('card-'+a);
-    if(el){const dot=el.querySelector('.dot');if(dot){dot.style.background='#7A9A7E';dot.classList.remove('dot')}el.style.opacity='.5';el.style.transform='scale(.95)'}
+    if(el){el.classList.remove('active');el.classList.add('done');const dot=el.querySelector('.dot');if(dot){dot.style.background='#7A9A7E';dot.classList.remove('dot')}}
   });
   agentCards.push(agent);phaseStart=Date.now();
   const pi=RESEARCH_PHASES.indexOf(agent);
@@ -357,7 +359,7 @@ function showAgentCard(agent){
   const d=document.createElement('div');
   d.className='agent-card flex justify-start';
   d.innerHTML='<div class="rounded-xl px-3 py-2 text-xs transition-all duration-500" style="background:rgba(196,133,63,.08);border:1.5px solid rgba(196,133,63,.25);transform:scale(1.02);min-width:180px"><div class="flex items-center gap-2"><span class="dot w-2 h-2 rounded-full" style="background:#C4853F"></span><span style="color:#A06530">'+(idx?'Step '+idx+'/4: ':'')+icon+' '+label+'</span></div>'+(agent==='planner'||agent==='researcher'?'<div class="text-muted text-[10px] mt-1 ml-4" id="timer-'+agent+'">刚刚开始…</div>':'')+'</div>';
-  d.id='card-'+agent;
+  d.id='card-'+agent;d.classList.add('active');
   c.appendChild(d);c.scrollTop=c.scrollHeight;
   if(agent==='planner'||agent==='researcher'){
     const timer=()=>{const el=document.getElementById('timer-'+agent);if(el){const s=Math.round((Date.now()-phaseStart)/1000);el.textContent='已等待 '+s+' 秒…'}};
