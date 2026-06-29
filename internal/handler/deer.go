@@ -40,7 +40,7 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 		if last.Role == schema.User {
 			last.UserInputMultiContent = append(last.UserInputMultiContent,
 				schema.MessageInputPart{Type: schema.ChatMessagePartTypeImageURL,
-					Image: &schema.MessageInputImage{MessagePartCommon: schema.MessagePartCommon{URL: req.ImageBase64}}})
+					Image: &schema.MessageInputImage{MessagePartCommon: schema.MessagePartCommon{URL: &req.ImageBase64}}})
 		}
 	}
 
