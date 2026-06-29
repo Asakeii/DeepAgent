@@ -128,7 +128,7 @@ func runCheckin(cfg *conf.Config) {
 		threadID = "console-default"
 	}
 
-	agent, err := agent.NewCheckinAgent(ctx)
+	agent, err := agent.NewCheckinAgent(ctx, threadID)
 	if err != nil {
 		log.Fatal(err)
 	}

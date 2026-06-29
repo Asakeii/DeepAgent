@@ -152,15 +152,13 @@ func joinStrings(ss []string, sep string) string {
 
 // CheckinTools 返回 checkin agent 使用的全部工具。
 // db 和 visionModel 由调用方注入；threadID 通过 context.WithValue(ctxKeyThreadID{}, tid) 在调用时传入。
-func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel) ([]tool.BaseTool, error) {
+func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel, threadID string) ([]tool.BaseTool, error) {
 	var tools []tool.BaseTool
 
 	rc, err := utils.InferTool("record_checkin",
 		"记录一条用户打卡（学习/运动/饮食等）",
 		func(ctx context.Context, in checkinInput) (checkinOutput, error) {
-			if tid := ThreadIDFromCtx(ctx); tid != "" {
-				in.ThreadID = tid
-			}
+			in.ThreadID = threadID
 			return recordCheckin(ctx, in, db)
 		})
 	if err != nil {
@@ -171,9 +169,7 @@ func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel) 
 	qc, err := utils.InferTool("query_checkin",
 		"查询用户历史打卡记录",
 		func(ctx context.Context, in queryCheckinInput) (queryCheckinOutput, error) {
-			if tid := ThreadIDFromCtx(ctx); tid != "" {
-				in.ThreadID = tid
-			}
+			in.ThreadID = threadID
 			return queryCheckin(ctx, in, db)
 		})
 	if err != nil {
@@ -184,9 +180,7 @@ func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel) 
 	gs, err := utils.InferTool("get_summary",
 		"汇总用户最近若干天的打卡情况",
 		func(ctx context.Context, in summaryInput) (summaryOutput, error) {
-			if tid := ThreadIDFromCtx(ctx); tid != "" {
-				in.ThreadID = tid
-			}
+			in.ThreadID = threadID
 			return getSummary(ctx, in, db)
 		})
 	if err != nil {
@@ -197,9 +191,7 @@ func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel) 
 	af, err := utils.InferTool("analyze_food",
 		"分析食物图片，识别所有食物的名称、份量和热量，并自动记录到打卡。用户发食物照片时调用此工具。",
 		func(ctx context.Context, in analyzeInput) (analyzeResult, error) {
-			if tid := ThreadIDFromCtx(ctx); tid != "" {
-				in.ThreadID = tid
-			}
+			in.ThreadID = threadID
 			return analyzeFood(ctx, in, db, visionModel)
 		})
 	if err != nil {
@@ -209,7 +201,9 @@ func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel) 
 
 	cr, err := utils.InferTool("create_reminder",
 		"创建一个定时提醒（每天/每周提醒等），用户说'每天8点提醒我喝水'时调用",
-		makeCreateReminder(db))
+		func(ctx context.Context, in createReminderInput) (createReminderOutput, error) {
+			return createReminder(ctx, in, threadID, db)
+		})
 	if err != nil {
 		return nil, fmt.Errorf("infer create_reminder: %w", err)
 	}
@@ -217,7 +211,9 @@ func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel) 
 
 	lr, err := utils.InferTool("list_reminders",
 		"列出用户当前的所有提醒",
-		makeListReminders(db))
+		func(ctx context.Context, in listRemindersInput) (listRemindersOutput, error) {
+			return listReminders(ctx, in, threadID, db)
+		})
 	if err != nil {
 		return nil, fmt.Errorf("infer list_reminders: %w", err)
 	}
@@ -225,7 +221,9 @@ func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel) 
 
 	dr, err := utils.InferTool("delete_reminder",
 		"删除一条提醒（需要提醒的 id，先 list_reminders 获取）",
-		makeDeleteReminder(db))
+		func(ctx context.Context, in deleteReminderInput) (deleteReminderOutput, error) {
+			return deleteReminder(ctx, in, threadID, db)
+		})
 	if err != nil {
 		return nil, fmt.Errorf("infer delete_reminder: %w", err)
 	}

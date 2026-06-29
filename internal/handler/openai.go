@@ -6,20 +6,14 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
 	"deepAgent/internal/agent"
-	"deepAgent/internal/consts"
-	"deepAgent/internal/infra"
-	"deepAgent/internal/model"
 )
 
 // OpenAICompatible 提供 /v1/chat/completions 端点。
-// WeClaw 的 HTTP mode 通过此端点将微信消息转发给 deepAgent。
+// WeClaw 微信桥接直走 checkin agent（打卡/记录/查询/提醒/闲聊），不经过 Coordinator 研究图。
 func OpenAICompatible(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
 	var req ChatCompletionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeOpenAIError(w, "invalid request body: "+err.Error())
@@ -35,7 +29,6 @@ func OpenAICompatible(w http.ResponseWriter, r *http.Request) {
 		threadID = "weclaw-default"
 	}
 
-	// 转换消息格式
 	msgs := make([]*schema.Message, len(req.Messages))
 	for i, m := range req.Messages {
 		role := schema.User
@@ -48,57 +41,12 @@ func OpenAICompatible(w http.ResponseWriter, r *http.Request) {
 		msgs[i] = &schema.Message{Role: role, Content: m.Content}
 	}
 
-	runnable := agent.GetAgent()
-	opts := []compose.Option{
-		compose.WithStateModifier(func(ctx context.Context, path compose.NodePath, s any) error {
-			st := s.(*model.State)
-			st.Messages = msgs
-			st.ThreadID = threadID
-			st.Locale = "zh-CN"
-			st.AutoAcceptedPlan = true
-			return nil
-		}),
-	}
-	if threadID != "" {
-		opts = append(opts, compose.WithCheckPointID(threadID))
-	}
-
-	var sb strings.Builder
-	outChan := make(chan string)
-	done := make(chan struct{})
-	go func() {
-		for s := range outChan {
-			sb.WriteString(s)
-		}
-		close(done)
-	}()
-
-	_, err := runnable.Stream(ctx, consts.Coordinator,
-		append(opts, compose.WithCallbacks(&infra.LoggerCallback{
-			ID:  threadID,
-			Out: outChan,
-		}))...,
-	)
-	close(outChan)
-	<-done
-
+	resp, err := agent.RunCheckin(context.Background(), msgs, threadID)
 	if err != nil {
-		writeOpenAICompletions(w, sb.String())
+		writeOpenAICompletions(w, err.Error())
 		return
 	}
-
-	// Coordinator 的 checkin 路由信号
-	if _, ok := agent.CheckinThreads.LoadAndDelete(threadID); ok {
-		resp, cerr := agent.RunCheckin(context.Background(), msgs, threadID)
-		if cerr != nil {
-			writeOpenAICompletions(w, cerr.Error())
-			return
-		}
-		writeOpenAICompletions(w, resp.Content)
-		return
-	}
-
-	writeOpenAICompletions(w, strings.TrimSpace(sb.String()))
+	writeOpenAICompletions(w, resp.Content)
 }
 
 // ---- OpenAI-compatible types ----

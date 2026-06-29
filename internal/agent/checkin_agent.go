@@ -15,8 +15,8 @@ import (
 // NewCheckinAgent 构造一个独立的 ReAct checkin agent（不入总图，直接 agent.Generate 调用）。
 // agent 使用 infra.ChatModel + 打卡工具集；MessageModifier 在调用前注入 system prompt。
 // threadID 通过 context.WithValue(tool.CtxKeyThreadID, tid) 在调用 agent.Generate 时传入。
-func NewCheckinAgent(ctx context.Context) (*react.Agent, error) {
-	tools, err := tool.CheckinTools(ctx, infra.DB, infra.VisionModel)
+func NewCheckinAgent(ctx context.Context, threadID string) (*react.Agent, error) {
+	tools, err := tool.CheckinTools(ctx, infra.DB, infra.VisionModel, threadID)
 	if err != nil {
 		return nil, fmt.Errorf("build checkin tools: %w", err)
 	}
@@ -41,7 +41,7 @@ func RunCheckin(ctx context.Context, msgs []*schema.Message, threadID string) (*
 		threadID = "console-default"
 	}
 
-	agent, err := NewCheckinAgent(ctx)
+	agent, err := NewCheckinAgent(ctx, threadID)
 	if err != nil {
 		return nil, fmt.Errorf("new checkin agent: %w", err)
 	}
@@ -53,8 +53,7 @@ func RunCheckin(ctx context.Context, msgs []*schema.Message, threadID string) (*
 		_ = infra.AppendMessageForCheckin(ctx, threadID, string(m.Role), m.Content)
 	}
 
-	agentCtx := tool.WithThreadID(ctx, threadID)
-	resp, err := agent.Generate(agentCtx, prompt)
+	resp, err := agent.Generate(ctx, prompt)
 	if err != nil {
 		return nil, err
 	}
