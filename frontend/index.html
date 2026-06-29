@@ -16,12 +16,12 @@
 .ring-coach{animation:ring-g 2.5s ease-in-out infinite}.ring-research{animation:ring-a 2.8s ease-in-out infinite}
 .f-in{animation:f-in .5s cubic-bezier(.34,1.56,.64,1) both}.f-d1{animation-delay:.05s}.f-d2{animation-delay:.1s}.f-d3{animation-delay:.15s}.f-d4{animation-delay:.2s}
 .msg-u{animation:msg-u .35s cubic-bezier(.34,1.56,.64,1) both}.msg-b{animation:msg-b .35s cubic-bezier(.34,1.56,.64,1) both}
-.card-stack{position:relative;min-height:40px;margin-bottom:8px}
-.c-card{position:absolute;left:0;right:0;transition:all .5s cubic-bezier(.34,1.56,.64,1)}
-.c-card:nth-child(1){z-index:1}.c-card:nth-child(2){z-index:2}.c-card:nth-child(3){z-index:3}.c-card:nth-child(4){z-index:4}.c-card:nth-child(5){z-index:5}
-.c-card.active{z-index:20 !important;transform:translateY(0) scale(1)}
-.c-card.done{opacity:.25;transform:translateY(-8px) scale(.88);filter:grayscale(.6)}
-.c-card.done:hover{opacity:.6;transform:translateY(-4px) scale(.92)}
+.card-stack{position:relative;height:56px}
+.c-card{position:absolute;left:0;right:0;top:0;transition:all .5s cubic-bezier(.34,1.56,.64,1);transform-origin:top center}
+.c-card.pos-0{z-index:10;transform:translateY(0) scale(1);opacity:1;filter:none}
+.c-card.pos-1{z-index:9;transform:translateY(-6px) scale(.94);opacity:.45;filter:grayscale(.3)}
+.c-card.pos-2{z-index:8;transform:translateY(-12px) scale(.88);opacity:.2;filter:grayscale(.6)}
+.c-card.pos-3{z-index:7;transform:translateY(-16px) scale(.84);opacity:.08;filter:grayscale(.8)}
 .c-card-in{animation:card-in .35s cubic-bezier(.34,1.56,.64,1) both}
 .panel-in{animation:slide-p .3s cubic-bezier(.16,1,.3,1) both}
 .rbox{animation:f-in .4s cubic-bezier(.34,1.56,.64,1) both;border:1.5px solid rgba(196,133,63,.2);background:linear-gradient(135deg,rgba(196,133,63,.04),rgba(196,133,63,.01))}
