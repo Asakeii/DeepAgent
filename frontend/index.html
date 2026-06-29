@@ -62,10 +62,10 @@ function acard(ag){
   acards.push(ag);phaseS=Date.now();
   var pi=PHASES.indexOf(ag);
   if(pi>=0){var bar=document.getElementById('pbar'),fill=document.getElementById('pfill');bar.classList.remove('hidden');fill.style.width=Math.round(((pi+1)/PHASES.length)*100)+'%';if(ag==='reporter'){fill.style.background='#7A9A7E';setTimeout(function(){bar.classList.add('hidden')},2000)}}
-  var ic=AGIC[ag]||'⚡',lb=AGLB[ag]||ag,ix=pi>=0?pi+1:'',n=acards.length;
+  var ic=AGIC[ag]||'⚡',lb=AGLB[ag]||ag,n=acards.length;var stepLabel=(pi>0?'Step '+(pi)+'/3: ':'');
   var d=document.createElement('div');d.className='c-card c-card-in active';d.id='c-'+ag;
   d.style.top=(n-1)*8+'px';
-  d.innerHTML='<div class="rounded-xl px-3 py-2 text-xs" style="background:rgba(196,133,63,.08);border:1.5px solid rgba(196,133,63,.25);min-width:180px"><div class="flex items-center gap-2"><span class="dot w-2 h-2 rounded-full" style="background:#C4853F"></span><span style="color:#A06530">'+(ix?'Step '+ix+'/4: ':'')+ic+' '+lb+'</span></div>'+((ag==='planner'||ag==='researcher')?'<div class="c-m text-[10px] mt-1 ml-4" id="tm-'+ag+'">刚刚开始…</div>':'')+'</div>';
+  d.innerHTML='<div class="rounded-xl px-3 py-2 text-xs" style="background:rgba(196,133,63,.08);border:1.5px solid rgba(196,133,63,.25);min-width:180px"><div class="flex items-center gap-2"><span class="dot w-2 h-2 rounded-full" style="background:#C4853F"></span><span style="color:#A06530">'+stepLabel+ic+' '+lb+'</span></div>'+((ag==='planner'||ag==='researcher')?'<div class="c-m text-[10px] mt-1 ml-4" id="tm-'+ag+'">刚刚开始…</div>':'')+'</div>';
   stack.appendChild(d);document.getElementById('mc').scrollTop=document.getElementById('mc').scrollHeight;
   if(ag==='planner'||ag==='researcher'){var tm=function(){var el=document.getElementById('tm-'+ag);if(el){el.textContent='已等待 '+Math.round((Date.now()-phaseS)/1000)+' 秒…'}};tm();var iv=setInterval(tm,2000);acards._iv=acards._iv||{};if(acards._iv[ag])clearInterval(acards._iv[ag]);acards._iv[ag]=iv}
 }
@@ -97,7 +97,7 @@ async function send(){
       if(l.startsWith('event: agent'))continue;if(!l.startsWith('data:'))continue;
       try{var j=JSON.parse(l.slice(5).trim());if(!j.content||j.content==='end'||j.content==='processed')continue;
         if(j.role==='tool'){if(j.content)handleTRes(j.content);continue}
-        if(j.agent&&j.agent!=='human_feedback'){stat(j.agent);ring(j.agent==='checkin'?'coach':j.agent?'research':'idle');if(j.agent!==lastAg){acard(j.agent);lastAg=j.agent}}
+        if(j.agent&&j.agent!=='human_feedback'){stat(j.agent);ring(j.agent==='checkin'?'coach':j.agent?'research':'idle');if(j.agent!==lastAg&&PHASES.indexOf(j.agent)>0){acard(j.agent);lastAg=j.agent}}
         if(j.tool_calls&&j.tool_calls[0])handleTC(j.tool_calls[0]);if(j.tool_call_chunks&&j.tool_call_chunks[0])handleTCC(j.tool_call_chunks[0]);
         if(!st){rmM(tmpId);st=true}c+=j.content||'';
         if(lastAg==='planner')upM(tmpId,'<div class="rounded-xl px-3 py-2 text-xs font-mono c-s leading-relaxed" style="background:rgba(196,133,63,.04);border:1px solid rgba(196,133,63,.1);max-height:120px;overflow-y:auto;white-space:pre-wrap;word-break:break-all">'+E(c.slice(-500))+'</div>');
