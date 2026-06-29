@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/cloudwego/eino/compose"
+	"github.com/cloudwego/eino/schema"
 
 	"deepAgent/internal/agent"
 	"deepAgent/internal/consts"
@@ -37,9 +38,9 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 	if req.ImageBase64 != "" && len(req.Messages) > 0 {
 		last := req.Messages[len(req.Messages)-1]
 		if last.Role == schema.User {
-			last.MultiContent = append(last.MultiContent,
-				schema.ChatMessagePart{Type: schema.ChatMessagePartTypeImageURL,
-					ImageURL: &schema.ChatMessageImageURL{URL: req.ImageBase64}})
+			last.UserInputMultiContent = append(last.UserInputMultiContent,
+				schema.MessageInputPart{Type: schema.ChatMessagePartTypeImageURL,
+					Image: &schema.MessageInputImage{MessagePartCommon: schema.MessagePartCommon{URL: req.ImageBase64}}})
 		}
 	}
 
