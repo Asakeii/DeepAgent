@@ -243,7 +243,7 @@ function addMsg(role,content,id,idx){
   if(role==='user'){
     d.innerHTML='<div class="max-w-[80%] sm:max-w-[65%] msg-user rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed shadow-sm">'+esc(content)+'</div>';
   }else{
-    d.innerHTML='<div class="flex items-start gap-2 max-w-[92%] sm:max-w-[75%]"><div class="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold select-none" style="background:#2C2926;color:#FBFAF8">D</div><div class="msg-assistant rounded-2xl rounded-bl-md px-4 py-2.5 text-sm leading-relaxed shadow-sm">'+content+'</div></div>';
+    d.innerHTML='<div class="flex items-start gap-2 max-w-[92%] sm:max-w-[75%]"><div class="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold select-none" style="background:#2C2926;color:#FBFAF8">⚡</div><div class="msg-assistant rounded-2xl rounded-bl-md px-4 py-2.5 text-sm leading-relaxed shadow-sm">'+content+'</div></div>';
   }
   if(id)d.id=id;c.appendChild(d);c.scrollTop=c.scrollHeight;
 }
