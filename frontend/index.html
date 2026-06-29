@@ -82,7 +82,7 @@
           <textarea id="input" rows="1" placeholder="记录今天的点滴，或提出你想了解的问题…贴上图片可分析食物热量"
             class="flex-1 bg-transparent resize-none outline-none text-sm py-1.5 px-1.5 max-h-32 placeholder:text-muted"
             onkeydown="handleKey(event)" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,128)+'px'"
-            onpaste="handlePaste(event)"></textarea>
+            ></textarea>
           <button id="btn-send" onclick="send()" class="btn-send shrink-0 w-9 h-9 rounded-xl bg-body text-page flex items-center justify-center hover:opacity-85 transition-all duration-300 disabled:opacity-60 disabled:scale-95">
             <svg id="btn-send-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
             <svg id="btn-send-loading" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="hidden" style="animation:spin .8s linear infinite"><circle cx="12" cy="12" r="9" stroke-dasharray="42" stroke-dashoffset="10"/></svg>
@@ -194,15 +194,15 @@ function quickSend(t){document.getElementById('input').value=t;send()}
 async function send(){
   if(sending)return;
   const input=document.getElementById('input'),btn=document.getElementById('btn-send');
+  const img=imageB64;imageB64='';clearImage();
   const text=input.value.trim();if(!text&&!img)return;
   input.value='';input.style.height='auto';sending=true;btn.disabled=true;
-  const img=imageB64;imageB64='';clearImage();
   setRing('explore');setStatus('coordinator');
 
   const empty=document.getElementById('msg-container').querySelector('.flex.items-center.justify-center');
   if(empty)empty.innerHTML='';
 
-  addMsg('user',text);
+  addMsg('user',text||'📷 图片分析');
   const tmpId='t-'+Math.random().toString(36).slice(2);
   addMsg('assistant','<div class="flex gap-1.5 items-center h-3"><span class="w-1.5 h-1.5 rounded-full" style="background:rgba(44,41,38,.2);animation:dot-pulse 1s ease-in-out infinite"></span><span class="w-1.5 h-1.5 rounded-full" style="background:rgba(44,41,38,.2);animation:dot-pulse 1s ease-in-out .15s infinite"></span><span class="w-1.5 h-1.5 rounded-full" style="background:rgba(44,41,38,.2);animation:dot-pulse 1s ease-in-out .3s infinite"></span></div>',tmpId);
 
@@ -271,6 +271,7 @@ function renderSteps(){
 }
 
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+document.addEventListener('paste',handlePaste);
 loadSessions();
 </script>
 </body>
