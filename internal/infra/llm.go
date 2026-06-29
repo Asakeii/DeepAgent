@@ -38,11 +38,12 @@ func InitModel(ctx context.Context) error {
 		return fmt.Errorf("model.base_url is empty")
 	}
 
-	// 普通 Chat Completion，无 response_format 约束
+	// 普通 Chat Completion（开启推理，豆包 Seed 2.0 支持 thinking）
 	chatModel, err := modelopenai.NewChatModel(ctx, &modelopenai.ChatModelConfig{
-		BaseURL: cfg.BaseURL,
-		APIKey:  cfg.APIKey,
-		Model:   cfg.DefaultModel,
+		BaseURL:         cfg.BaseURL,
+		APIKey:          cfg.APIKey,
+		Model:           cfg.DefaultModel,
+		ReasoningEffort: modelopenai.ReasoningEffortLevelMedium,
 	})
 	if err != nil {
 		return fmt.Errorf("init chat model: %w", err)
