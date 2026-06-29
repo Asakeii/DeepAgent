@@ -248,6 +248,14 @@ async function send(){
             setStatus(j.agent==='human_feedback'?'':j.agent);setRing(j.agent==='checkin'?'coach':j.agent?'explore':'idle');
             if(j.agent!==lastAgent){showAgentCard(j.agent);lastAgent=j.agent}
           }
+          // Planner 阶段：流式展示 LLM 输出的原始 JSON（用户感知进度）
+          let plannerStream=(j.agent==='planner'||lastAgent==='planner')&&(j.message_chunks||(j.tool_call_chunks&&j.tool_call_chunks[0]));
+          if(plannerStream){
+            if(!st){st=true;removeMsg(tmpId)}
+            const txt=j.message_chunks||(j.tool_call_chunks?j.tool_call_chunks[0]?.args||'':'');
+            c+=txt;updateMsg(tmpId,'<div class="rounded-xl px-3 py-2 text-xs font-mono text-subtle" style="background:rgba(196,133,63,.04);border:1px solid rgba(196,133,63,.1);max-height:100px;overflow:hidden;white-space:pre-wrap">'+esc(c.slice(-400))+'</div>');
+            continue;
+          }
           if(!st){st=true;removeMsg(tmpId)}
           c+=j.content||'';
           if(lastAgent==='reporter'){updateMsg(tmpId,'<div class="report-card rounded-2xl px-5 py-4 text-sm leading-relaxed">'+formatMd(c)+'</div>')}
