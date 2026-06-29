@@ -160,13 +160,12 @@ func (cb *LoggerCallback) pushToolCall(ctx context.Context, data *model.ChatResp
 }
 
 func (cb *LoggerCallback) OnStart(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
-	if cb.Out == nil {
-		return ctx
-	}
-	if inputStr, ok := input.(string); ok {
-		cb.Out <- "\n==================\n"
-		cb.Out <- inputStr
-		cb.Out <- "\n==================\n"
+	// 不再往 Out 写裸文本节点标记，改为推送 SSE agent 事件供前端展示状态卡片
+	if inputStr, ok := input.(string); ok && inputStr != "" && cb.SSE != nil {
+		_ = cb.SSE.WriteEvent("agent", &model.ChatResp{
+			ThreadID: cb.ID,
+			Agent:    inputStr,
+		})
 	}
 	return ctx
 }
