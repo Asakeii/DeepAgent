@@ -47,7 +47,7 @@ func AnalyzeFoodDirect(ctx context.Context, imageB64, text, threadID string, db 
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("已记录「%s」：\n%s", category, formatFoodResult(result)) + "\n\n如需修改，回复"修改: xxx"", nil
+	return fmt.Sprintf("已记录「%s」：\n%s\n\n如需修改，回复'修改: xxx'", category, formatFoodResult(result)), nil
 }
 
 func mealCategory() string {
