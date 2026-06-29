@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"sync"
 
 	"github.com/cloudwego/eino/compose"
 
@@ -11,69 +10,23 @@ import (
 	"deepAgent/internal/model"
 )
 
-// ---------------------------------------------------------------
-// 全局单次编译的 Runnable（compile-once）。
-// Handler 通过 GetAgent() 获取，用 WithStateModifier 注入请求级 State。
-// ---------------------------------------------------------------
-
-var (
-	globalRunnable   compose.Runnable[string, string]
-	globalRunnableMu sync.Mutex
-)
-
-// GetAgent returns the compile-once global Runnable.
-// Call InitAgent first during server startup.
-func GetAgent() compose.Runnable[string, string] {
-	globalRunnableMu.Lock()
-	defer globalRunnableMu.Unlock()
-	return globalRunnable
-}
-
-// InitAgent compiles the full agent graph once. Must be called after InitDB/InitModel/InitMCP.
-func InitAgent(ctx context.Context) error {
-	globalRunnableMu.Lock()
-	defer globalRunnableMu.Unlock()
-	if globalRunnable != nil {
-		return nil // already compiled
-	}
-	r, err := compileGraph(ctx)
-	if err != nil {
-		return err
-	}
-	globalRunnable = r
-	return nil
-}
-
-// ---------------------------------------------------------------
-// 图路由与编译
-// ---------------------------------------------------------------
-
 // agentHandOff is the main graph branch function: reads state.Goto to decide next hop.
+// Matches deer-go's agentHandOff pattern exactly.
 func agentHandOff(ctx context.Context, input string) (string, error) {
 	next := compose.END
-	err := compose.ProcessState[*model.State](ctx, func(ctx context.Context, state *model.State) error {
+	_ = compose.ProcessState[*model.State](ctx, func(ctx context.Context, state *model.State) error {
 		next = state.Goto
 		return nil
 	})
-	return next, err
+	return next, nil
 }
 
-// compileGraph builds and compiles the complete agent graph once.
-// genFunc creates a default State; request details are injected via WithStateModifier at Stream time.
-func compileGraph(ctx context.Context) (compose.Runnable[string, string], error) {
-	defaultGenFunc := func(ctx context.Context) *model.State {
-		return &model.State{
-			Goto:                          consts.Coordinator,
-			Locale:                        "zh-CN",
-			MaxPlanIterations:             1,
-			MaxStepNum:                    3,
-			AutoAcceptedPlan:              true,
-			EnableBackgroundInvestigation: false,
-		}
-	}
-
+// Builder compiles the agent graph per-request, matching deer-go's pattern.
+// genFunc captures request-level data (Messages, ThreadID) at compile time,
+// ensuring sub-graph nodes see the correct state via eino's GenLocalState propagation.
+func Builder(ctx context.Context, genFunc compose.GenLocalState[*model.State]) (compose.Runnable[string, string], error) {
 	g := compose.NewGraph[string, string](
-		compose.WithGenLocalState(defaultGenFunc),
+		compose.WithGenLocalState(genFunc),
 	)
 
 	outMap := map[string]bool{

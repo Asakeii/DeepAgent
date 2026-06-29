@@ -42,10 +42,6 @@ func main() {
 	if err := infra.InitMCP(ctx); err != nil {
 		log.Fatal(err)
 	}
-	// 全局编译一次 agent 图（compile-once），后续请求复用
-	if err := agent.InitAgent(ctx); err != nil {
-		log.Fatal(err)
-	}
 	if os.Getenv("DEEPAGENT_DEBUG_MCP") == "true" {
 		if err := infra.LogMCPTools(ctx); err != nil {
 			log.Fatal(err)
@@ -66,22 +62,25 @@ func runCLI(cfg *conf.Config) {
 	userPrompt, _ := reader.ReadString('\n')
 	userPrompt = strings.TrimSpace(userPrompt)
 
-	// 注入请求级 State
 	msg := schema.UserMessage(userPrompt)
 	threadID := os.Getenv("DEEPAGENT_THREAD_ID")
-	opts := []compose.Option{
-		compose.WithStateModifier(func(ctx context.Context, path compose.NodePath, s any) error {
-			st := s.(*model.State)
-			st.Messages = []*schema.Message{msg}
-			st.Locale = "zh-CN"
-			st.MaxPlanIterations = cfg.Setting.MaxPlanIterations
-			st.MaxStepNum = cfg.Setting.MaxStepNum
-			st.ThreadID = threadID
-			return nil
-		}),
-	}
 
-	r := agent.GetAgent()
+	genFunc := func(ctx context.Context) *model.State {
+		return &model.State{
+			Messages:                      []*schema.Message{msg},
+			Goto:                          consts.Coordinator,
+			Locale:                        "zh-CN",
+			MaxPlanIterations:             cfg.Setting.MaxPlanIterations,
+			MaxStepNum:                    cfg.Setting.MaxStepNum,
+			AutoAcceptedPlan:              true,
+			EnableBackgroundInvestigation: cfg.Setting.EnableBackgroundInvestigation,
+			ThreadID:                      threadID,
+		}
+	}
+	r, errBuilder := agent.Builder(context.Background(), genFunc)
+	if errBuilder != nil {
+		log.Fatal(errBuilder)
+	}
 
 	outChan := make(chan string)
 	go func() {
@@ -92,10 +91,10 @@ func runCLI(cfg *conf.Config) {
 
 	var err error
 	_, err = r.Stream(context.Background(), consts.Coordinator,
-		append(opts, compose.WithCallbacks(&infra.LoggerCallback{
+		compose.WithCallbacks(&infra.LoggerCallback{
 			ID:  "console",
 			Out: outChan,
-		}))...,
+		}),
 	)
 	close(outChan)
 	if err != nil {
@@ -185,7 +184,7 @@ func runServer() {
 	// 前端静态文件
 	mux.Handle("/", http.FileServer(http.Dir("frontend")))
 
-	addr := ":8080"
+	addr := ":8741"
 	log.Printf("deepAgent server listening on %s", addr)
 	if err := http.ListenAndServe(addr, withCORS(mux)); err != nil {
 		log.Fatal(err)

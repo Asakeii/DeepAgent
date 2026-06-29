@@ -33,36 +33,40 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 		req.InterruptFeedback = NormalizeInterruptFeedback(req.InterruptFeedback)
 	}
 
-	runnable := agent.GetAgent()
-	opts := []compose.Option{
-		compose.WithStateModifier(func(ctx context.Context, path compose.NodePath, s any) error {
-			st := s.(*model.State)
-			if req.Messages != nil {
-				st.Messages = req.Messages
-			}
-			if req.ThreadID != "" {
-				st.ThreadID = req.ThreadID
-			}
-			st.Locale = "zh-CN"
-			if req.MaxPlanIterations > 0 {
-				st.MaxPlanIterations = req.MaxPlanIterations
-			}
-			if req.MaxStepNum > 0 {
-				st.MaxStepNum = req.MaxStepNum
-			}
-			st.AutoAcceptedPlan = req.AutoAcceptedPlan
-			st.EnableBackgroundInvestigation = req.EnableBackgroundInvestigation
-			if req.InterruptFeedback != "" {
-				st.InterruptFeedback = req.InterruptFeedback
-				if req.InterruptFeedback == consts.EditPlan && len(req.Messages) > 0 {
-					st.Messages = append(st.Messages, req.Messages...)
-				}
-			}
-			return nil
-		}),
+	// per-request Builder + genFunc（对齐 deer-go）：genFunc 在编译时创建 State，
+	// sub-graph 节点通过 GenLocalState 继承正确的 Messages。
+	genFunc := func(ctx context.Context) *model.State {
+		return &model.State{
+			Messages:                      req.Messages,
+			Goto:                          consts.Coordinator,
+			Locale:                        "zh-CN",
+			MaxPlanIterations:             req.MaxPlanIterations,
+			MaxStepNum:                    req.MaxStepNum,
+			AutoAcceptedPlan:              req.AutoAcceptedPlan,
+			EnableBackgroundInvestigation: req.EnableBackgroundInvestigation,
+			ThreadID:                      req.ThreadID,
+		}
 	}
+	runnable, err := agent.Builder(ctx, genFunc)
+	if err != nil {
+		_ = sse.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "build graph failed: " + err.Error()})
+		return
+	}
+
+	opts := []compose.Option{}
 	if req.ThreadID != "" {
 		opts = append(opts, compose.WithCheckPointID(req.ThreadID))
+	}
+	// 中断恢复：回填 InterruptFeedback
+	if req.InterruptFeedback != "" {
+		opts = append(opts, compose.WithStateModifier(func(ctx context.Context, path compose.NodePath, s any) error {
+			st := s.(*model.State)
+			st.InterruptFeedback = req.InterruptFeedback
+			if req.InterruptFeedback == consts.EditPlan && len(req.Messages) > 0 {
+				st.Messages = append(st.Messages, req.Messages...)
+			}
+			return nil
+		}))
 	}
 	opts = append(opts, compose.WithCallbacks(&infra.LoggerCallback{ID: req.ThreadID, SSE: sse}))
 
