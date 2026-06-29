@@ -24,13 +24,13 @@ mcp:
       # Set DEEPAGENT_DEBUG_MCP=true before startup to print loaded tools.
 
 model:
-  default_model: "<your model>"
-  api_key: "<your api key>"
-  base_url: "<your base url>"
+  default_model: "doubao-seed-2-0-mini-260428"
+  api_key: "ark-xxxxx"
+  base_url: "https://ark.cn-beijing.volces.com/api/v3"
   vision_model:              # 识图 agent 专用，初值复用上方；缺失回退主模型
     default_model: "<your vision model>"
-    api_key: "<your api key>"
-    base_url: "<your base url>"
+    api_key: "ark-xxxxx"
+    base_url: "https://ark.cn-beijing.volces.com/api/v3"
 
 setting:
   max_plan_iterations: 1
