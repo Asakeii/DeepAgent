@@ -237,7 +237,12 @@ async function send(){
         if(l.startsWith('event: interrupt')){setRing('explore');setStatus('human_feedback');showAgentCard('human_feedback');handleInterrupt();sending=false;btn.disabled=false;return}
         if(!l.startsWith('data:'))continue;
         try{const j=JSON.parse(l.slice(5).trim());
-          if(j.content==='end'||j.content==='processed')continue;if(j.role==='tool')continue;
+          if(j.content==='end'||j.content==='processed')continue;
+          // 搜索工具调用 → 展示搜索卡片
+          if(j.tool_calls&&j.tool_calls[0]){handleToolCall(j.tool_calls[0])}
+          if(j.tool_call_chunks&&j.tool_call_chunks[0]){handleToolChunk(j.tool_call_chunks[0])}
+          if(j.role==='tool'&&j.content){handleToolResult(j.content);continue}
+          if(j.role==='tool')continue;
           // agent 事件：展示进度卡片
           if(j.agent){
             setStatus(j.agent==='human_feedback'?'':j.agent);setRing(j.agent==='checkin'?'coach':j.agent?'explore':'idle');
@@ -278,7 +283,46 @@ function addMsgImg(img,text){
   d.innerHTML='<div class="max-w-[80%] sm:max-w-[65%] msg-user rounded-2xl rounded-br-md px-3 py-2 text-sm leading-relaxed shadow-sm"><img src="'+img+'" class="max-h-48 rounded-lg mb-1.5"/>'+(text?'<div>'+esc(text)+'</div>':'')+'</div>';
   c.appendChild(d);c.scrollTop=c.scrollHeight;
 }
-let agentCards=[];
+let agentCards=[],searchCards={},searchIdx=0;
+function handleToolCall(tc){
+  if(tc.name==='tavily-search'||tc.name==='web_search'){
+    searchIdx++;const id='sc-'+searchIdx;
+    searchCards[id]={query:''};
+    showSearchCard(id,'🔍 正在搜索…','')
+  }
+}
+function handleToolChunk(tc){
+  if(tc.name==='tavily-search'||tc.name==='web_search'){
+    try{const a=JSON.parse(tc.args||'{}');if(a.query){
+      const id='sc-'+searchIdx;
+      if(searchCards[id]){searchCards[id].query=a.query}
+      updateSearchCard(id,'🔍 '+a.query.slice(0,50)+(a.query.length>50?'…':''),'')
+    }}catch(_){}
+  }
+}
+function handleToolResult(content){
+  try{const r=JSON.parse(content);if(r.content){
+    const urls=extractURLs(JSON.stringify(r.content).slice(0,2000));
+    if(urls.length&&searchIdx){
+      const id='sc-'+searchIdx;
+      const html=urls.map(u=>'<a href="'+u+'" target="_blank" class="text-muted hover:text-subtle text-[10px] truncate block max-w-[200px]">↗ '+u.replace(/^https?:\/\//,'').split('/')[0]+'</a>').join('');
+      updateSearchCard(id,searchCards[id]?.query||'搜索完成','<div class="mt-1 opacity-50">'+html+'</div>');
+      setTimeout(()=>{const el=document.getElementById(id);if(el){el.style.opacity='0';el.style.transform='translateX(-20px)';setTimeout(()=>el.remove(),500)}},5000);
+    }
+  }}catch(_){}
+}
+function extractURLs(s){const m=s.match(/https?:\/\/[^\s",}]+/g);return m?[...new Set(m)].slice(0,4):[]}
+function showSearchCard(id,title,detail){
+  const c=document.getElementById('msg-container');
+  const d=document.createElement('div');
+  d.className='agent-card flex justify-start';
+  d.innerHTML='<div class="rounded-xl px-3 py-2 text-xs transition-all duration-700" style="background:rgba(122,154,126,.06);border:1px solid rgba(122,154,126,.15)"><span class="text-subtle">'+title+'</span>'+detail+'</div>';
+  d.id=id;c.appendChild(d);c.scrollTop=c.scrollHeight;
+}
+function updateSearchCard(id,title,detail){
+  const el=document.getElementById(id);if(!el)return;
+  el.querySelector('.rounded-xl').innerHTML='<span class="text-subtle">'+title+'</span>'+detail;
+}
 function showAgentCard(agent){
   // 将之前的卡片标记为完成
   agentCards.forEach(a=>{
