@@ -2,7 +2,7 @@
 <html lang="zh-CN" class="h-full">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>日课 — 你的私人教练</title>
+<title>Lightning — 你的私人教练</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -54,7 +54,7 @@
 <body class="font-body bg-page text-body h-full flex flex-col overflow-hidden">
 
 <nav class="flex items-center justify-between px-5 py-3 border-b border-hairline shrink-0">
-  <a href="/" class="font-display text-lg font-bold tracking-tight float-in cursor-pointer hover:opacity-80 transition-opacity no-underline text-body">日课</a>
+  <a href="/" class="font-display text-lg font-bold tracking-tight float-in cursor-pointer hover:opacity-80 transition-opacity no-underline text-body">Lightning</a>
   <div class="flex items-center gap-4">
     <span id="status-text" class="text-xs text-subtle hidden sm:inline transition-all duration-300 float-in float-in-d1"></span>
     <button onclick="newChat()" class="nav-btn text-xs text-subtle float-in float-in-d2">新对话</button>
@@ -69,8 +69,8 @@
   <main class="flex-1 flex flex-col min-w-0">
     <div id="msg-container" class="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-4 scrollbar">
       <div class="flex flex-col items-center justify-center h-full">
-        <div class="font-display text-5xl mb-4 italic float-in" style="font-weight:500">日课</div>
-        <p class="text-sm text-muted mb-6 float-in float-in-d1">你的私人教练，亦是知识伙伴</p>
+        <div class="font-display text-5xl mb-4 italic float-in" style="font-weight:500">Lightning</div>
+        <p class="text-sm text-muted mb-6 float-in float-in-d1">A spark of discipline, every day.</p>
         <div class="flex flex-wrap justify-center gap-2 max-w-sm">
           <button onclick="quickSend('今天慢跑了五公里')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d1">晨跑归来</button>
           <button onclick="quickSend('记录一下午餐')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d2">记录午餐</button>
@@ -190,7 +190,7 @@ async function switchSession(tid){
 
 function newChat(){
   threadId='web-'+Date.now();steps=[];document.getElementById('research-panel').classList.add('hidden');
-  document.getElementById('msg-container').innerHTML='<div class="flex flex-col items-center justify-center h-full"><div class="font-display text-5xl mb-4 italic float-in" style="font-weight:500">日课</div><p class="text-sm text-muted mb-6 float-in float-in-d1">你的私人教练，亦是知识伙伴</p><div class="flex flex-wrap justify-center gap-2 max-w-sm"><button onclick="quickSend(\'今天慢跑了五公里\')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d1">晨跑归来</button><button onclick="quickSend(\'记录一下午餐\')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d2">记录午餐</button><button onclick="quickSend(\'看看这周运动情况\')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d3">本周回顾</button><button onclick="quickSend(\'帮我分析一下最近有哪些新出的 AI 编程工具\')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d4">研究探索</button></div></div>';
+  document.getElementById('msg-container').innerHTML='<div class="flex flex-col items-center justify-center h-full"><div class="font-display text-5xl mb-4 italic float-in" style="font-weight:500">Lightning</div><p class="text-sm text-muted mb-6 float-in float-in-d1">A spark of discipline, every day.</p><div class="flex flex-wrap justify-center gap-2 max-w-sm"><button onclick="quickSend(\'今天慢跑了五公里\')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d1">晨跑归来</button><button onclick="quickSend(\'记录一下午餐\')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d2">记录午餐</button><button onclick="quickSend(\'看看这周运动情况\')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d3">本周回顾</button><button onclick="quickSend(\'帮我分析一下最近有哪些新出的 AI 编程工具\')" class="chip px-3 py-1.5 bg-surface hover:bg-hover rounded-full text-xs text-subtle transition-all duration-200 float-in float-in-d4">研究探索</button></div></div>';
   loadSessions();setRing('idle');setStatus('');
 }
 

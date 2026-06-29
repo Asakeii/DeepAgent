@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#7A9A7E"/><stop offset="100%" style="stop-color:#5C7A60"/></linearGradient></defs>
-  <circle cx="50" cy="50" r="45" fill="url(#g)"/>
-  <text x="50" y="68" text-anchor="middle" font-family="serif" font-size="55" font-weight="700" fill="#FBFAF8">日</text>
+  <defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#C4853F"/><stop offset="100%" style="stop-color:#E0A850"/></linearGradient></defs>
+  <circle cx="50" cy="50" r="46" fill="url(#g)"/>
+  <polygon points="52,10 24,52 44,52 32,90 78,42 54,42 66,10" fill="#FBFAF8" stroke="#FBFAF8" stroke-width="2" stroke-linejoin="round"/>
 </svg>
