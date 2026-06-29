@@ -16,9 +16,13 @@
 .ring-coach{animation:ring-g 2.5s ease-in-out infinite}.ring-research{animation:ring-a 2.8s ease-in-out infinite}
 .f-in{animation:f-in .5s cubic-bezier(.34,1.56,.64,1) both}.f-d1{animation-delay:.05s}.f-d2{animation-delay:.1s}.f-d3{animation-delay:.15s}.f-d4{animation-delay:.2s}
 .msg-u{animation:msg-u .35s cubic-bezier(.34,1.56,.64,1) both}.msg-b{animation:msg-b .35s cubic-bezier(.34,1.56,.64,1) both}
-.acard{animation:card-in .3s cubic-bezier(.34,1.56,.64,1) both}
-.acard.active{z-index:10;transform:scale(1.015);filter:none}
-.acard.done{z-index:5;opacity:.3;transform:scale(.92) translateY(-3px);filter:grayscale(.5)}
+.card-stack{position:relative;min-height:40px;margin-bottom:8px}
+.c-card{position:absolute;left:0;right:0;transition:all .5s cubic-bezier(.34,1.56,.64,1)}
+.c-card:nth-child(1){z-index:1}.c-card:nth-child(2){z-index:2}.c-card:nth-child(3){z-index:3}.c-card:nth-child(4){z-index:4}.c-card:nth-child(5){z-index:5}
+.c-card.active{z-index:20 !important;transform:translateY(0) scale(1)}
+.c-card.done{opacity:.25;transform:translateY(-8px) scale(.88);filter:grayscale(.6)}
+.c-card.done:hover{opacity:.6;transform:translateY(-4px) scale(.92)}
+.c-card-in{animation:card-in .35s cubic-bezier(.34,1.56,.64,1) both}
 .panel-in{animation:slide-p .3s cubic-bezier(.16,1,.3,1) both}
 .rbox{animation:f-in .4s cubic-bezier(.34,1.56,.64,1) both;border:1.5px solid rgba(196,133,63,.2);background:linear-gradient(135deg,rgba(196,133,63,.04),rgba(196,133,63,.01))}
 .surl{animation:f-in .3s ease both}
@@ -52,15 +56,17 @@ function busy(v){document.getElementById('sic').classList.toggle('hidden',v);doc
 function hk(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(!sendbusy)send()}}
 function qs(t){document.getElementById('inp').value=t;send()}
 function acard(ag){
+  var stack=document.getElementById('card-stack');
+  if(!stack){stack=document.createElement('div');stack.className='card-stack';stack.id='card-stack';var mc=document.getElementById('mc');mc.appendChild(stack);mc.scrollTop=mc.scrollHeight}
   acards.forEach(function(a){var el=document.getElementById('c-'+a);if(el){el.classList.remove('active');el.classList.add('done');var d=el.querySelector('.dot');if(d){d.style.background='#7A9A7E';d.classList.remove('dot')}}});
   acards.push(ag);phaseS=Date.now();
   var pi=PHASES.indexOf(ag);
   if(pi>=0){var bar=document.getElementById('pbar'),fill=document.getElementById('pfill');bar.classList.remove('hidden');fill.style.width=Math.round(((pi+1)/PHASES.length)*100)+'%';if(ag==='reporter'){fill.style.background='#7A9A7E';setTimeout(function(){bar.classList.add('hidden')},2000)}}
-  var ic=AGIC[ag]||'⚡',lb=AGLB[ag]||ag,ix=pi>=0?pi+1:'';
-  var c=document.getElementById('mc'),d=document.createElement('div');
-  d.className='acard flex justify-start active';d.id='c-'+ag;
-  d.innerHTML='<div class="rounded-xl px-3 py-2 text-xs transition-all duration-500" style="background:rgba(196,133,63,.08);border:1.5px solid rgba(196,133,63,.25);min-width:160px"><div class="flex items-center gap-2"><span class="dot w-2 h-2 rounded-full" style="background:#C4853F"></span><span style="color:#A06530">'+(ix?'Step '+ix+'/4: ':'')+ic+' '+lb+'</span></div>'+((ag==='planner'||ag==='researcher')?'<div class="c-m text-[10px] mt-1 ml-4" id="tm-'+ag+'">刚刚开始…</div>':'')+'</div>';
-  c.appendChild(d);c.scrollTop=c.scrollHeight;
+  var ic=AGIC[ag]||'⚡',lb=AGLB[ag]||ag,ix=pi>=0?pi+1:'',n=acards.length;
+  var d=document.createElement('div');d.className='c-card c-card-in active';d.id='c-'+ag;
+  d.style.top=(n-1)*8+'px';
+  d.innerHTML='<div class="rounded-xl px-3 py-2 text-xs" style="background:rgba(196,133,63,.08);border:1.5px solid rgba(196,133,63,.25);min-width:180px"><div class="flex items-center gap-2"><span class="dot w-2 h-2 rounded-full" style="background:#C4853F"></span><span style="color:#A06530">'+(ix?'Step '+ix+'/4: ':'')+ic+' '+lb+'</span></div>'+((ag==='planner'||ag==='researcher')?'<div class="c-m text-[10px] mt-1 ml-4" id="tm-'+ag+'">刚刚开始…</div>':'')+'</div>';
+  stack.appendChild(d);document.getElementById('mc').scrollTop=document.getElementById('mc').scrollHeight;
   if(ag==='planner'||ag==='researcher'){var tm=function(){var el=document.getElementById('tm-'+ag);if(el){el.textContent='已等待 '+Math.round((Date.now()-phaseS)/1000)+' 秒…'}};tm();var iv=setInterval(tm,2000);acards._iv=acards._iv||{};if(acards._iv[ag])clearInterval(acards._iv[ag]);acards._iv[ag]=iv}
 }
 function srchCard(q){searchN++;var id='sc-'+searchN,c=document.getElementById('mc'),d=document.createElement('div');d.className='acard flex justify-start';d.id=id;d.innerHTML='<div class="rounded-xl px-3 py-2 text-xs" style="background:rgba(122,154,126,.06);border:1px solid rgba(122,154,126,.15)"><div class="flex items-center gap-2"><span class="dot w-2 h-2 rounded-full" style="background:#7A9A7E"></span><span class="c-s">🔍 '+E(q.slice(0,50))+'</span></div><div class="surls ml-4 mt-1 space-y-0.5"></div></div>';c.appendChild(d);c.scrollTop=c.scrollHeight}
@@ -75,7 +81,7 @@ function toggleHist(){hop=!hop;document.getElementById('hpan').classList.toggle(
 async function loadSess(){var list=document.getElementById('hlist');try{var r=await fetch('/api/sessions?limit=30');if(!r.ok)throw new Error(r.status);sess=await r.json();var cnt=document.getElementById('hcnt');if(sess.length){cnt.textContent=sess.length;cnt.classList.remove('hidden')}else{cnt.classList.add('hidden')}if(!sess.length){list.innerHTML='<div class="px-3 py-6 text-center text-xs c-m">暂无对话</div>';return}list.innerHTML=sess.map(function(s){var isA=s.ThreadID===tid,t=(s.FirstMsg||'新对话').slice(0,16);return'<div class="hitem px-3 py-2 rounded-lg cursor-pointer '+(isA?'bg-h':'hover:bg-h')+'" onclick="swSess(\''+s.ThreadID+'\')"><div class="text-xs truncate '+(isA?'c-b font-medium':'c-s')+'">'+E(t)+(s.FirstMsg&&s.FirstMsg.length>16?'…':'')+'</div><div class="text-[10px] c-m mt-0.5">'+ft(s.LastAt)+' · '+s.MsgCount+'条</div></div>'}).join('')}catch(e){list.innerHTML='<div class="px-3 py-6 text-center text-xs c-m">加载失败</div>'}}
 function ft(t){if(!t)return'';var d=new Date(t),n=new Date(),x=n-d;if(x<6e4)return'刚刚';if(x<36e5)return Math.floor(x/6e4)+'分钟前';if(x<864e5)return Math.floor(x/36e5)+'小时前';return(d.getMonth()+1)+'/'+d.getDate()}
 async function swSess(nt){tid=nt;steps=[];hop&&loadSess();document.getElementById('rpan').classList.add('hidden');var mc=document.getElementById('mc');mc.innerHTML='';try{var r=await fetch('/api/messages?thread_id='+nt);if(!r.ok)throw new Error(r.status);var ms=await r.json();ms.forEach(function(m,i){addM(m.Role==='user'?'user':'assistant',m.Content,'',i)});mc.scrollTop=mc.scrollHeight}catch(e){mc.innerHTML='<div class="flex items-center justify-center h-full c-m text-sm">加载失败</div>'}}
-function newChat(){tid='w-'+Date.now();steps=[];document.getElementById('rpan').classList.add('hidden');document.getElementById('mc').innerHTML='<div class="flex flex-col items-center justify-center h-full"><div class="font-d text-5xl mb-4 italic f-in" style="font-weight:500">Lightning</div><p class="text-sm c-m mb-6 f-in f-d1">A spark of discipline, every day.</p><div class="flex flex-wrap justify-center gap-2 max-w-sm"><button onclick="qs(\'今天慢跑了五公里\')" class="chip px-3 py-1.5 bg-s hover:bg-h rounded-full text-xs c-s transition-all duration-200 f-in f-d1">晨跑归来</button><button onclick="qs(\'记录一下午餐\')" class="chip px-3 py-1.5 bg-s hover:bg-h rounded-full text-xs c-s transition-all duration-200 f-in f-d2">记录午餐</button><button onclick="qs(\'看看这周运动情况\')" class="chip px-3 py-1.5 bg-s hover:bg-h rounded-full text-xs c-s transition-all duration-200 f-in f-d3">本周回顾</button><button onclick="qs(\'帮我分析一下最近有哪些新出的 AI 编程工具\')" class="chip px-3 py-1.5 bg-s hover:bg-h rounded-full text-xs c-s transition-all duration-200 f-in f-d4">研究探索</button></div></div>';loadSess();ring('idle');stat('')}
+function newChat(){tid='w-'+Date.now();steps=[];acards=[];lastAg='';var cs=document.getElementById('card-stack');if(cs)cs.remove();document.getElementById('rpan').classList.add('hidden');document.getElementById('pbar').classList.add('hidden');document.getElementById('mc').innerHTML='<div class="flex flex-col items-center justify-center h-full"><div class="font-d text-5xl mb-4 italic f-in" style="font-weight:500">Lightning</div><p class="text-sm c-m mb-6 f-in f-d1">A spark of discipline, every day.</p><div class="flex flex-wrap justify-center gap-2 max-w-sm"><button onclick="qs(\'今天慢跑了五公里\')" class="chip px-3 py-1.5 bg-s hover:bg-h rounded-full text-xs c-s transition-all duration-200 f-in f-d1">晨跑归来</button><button onclick="qs(\'记录一下午餐\')" class="chip px-3 py-1.5 bg-s hover:bg-h rounded-full text-xs c-s transition-all duration-200 f-in f-d2">记录午餐</button><button onclick="qs(\'看看这周运动情况\')" class="chip px-3 py-1.5 bg-s hover:bg-h rounded-full text-xs c-s transition-all duration-200 f-in f-d3">本周回顾</button><button onclick="qs(\'帮我分析一下最近有哪些新出的 AI 编程工具\')" class="chip px-3 py-1.5 bg-s hover:bg-h rounded-full text-xs c-s transition-all duration-200 f-in f-d4">研究探索</button></div></div>';loadSess();ring('idle');stat('')}
 async function send(){
   if(sendbusy)return;var inp=document.getElementById('inp'),btn=document.getElementById('bsend'),img=imgB64,text=inp.value.trim();
   imgB64='';clrImg();inp.value='';inp.style.height='auto';if(!text&&!img)return;
