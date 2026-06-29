@@ -67,9 +67,12 @@ func routeCoordinatorResult(ctx context.Context, state *model.State, input *sche
 		if locale := argMap["locale"]; locale != "" {
 			state.Locale = locale
 		}
-		// 打卡任务不进研究图：标记路由目标，图在此结束，由 handler 层切到 checkin agent
+		// 打卡任务不进研究图：sigal handler 层切到 checkin agent
 		state.RouteToCheckin = true
 		state.Goto = compose.END
+		if state.ThreadID != "" {
+			CheckinThreads.Store(state.ThreadID, true)
+		}
 	}
 
 	return nil

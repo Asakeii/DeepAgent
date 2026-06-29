@@ -33,9 +33,7 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 		req.InterruptFeedback = NormalizeInterruptFeedback(req.InterruptFeedback)
 	}
 
-	var routedToCheckin bool
 	runnable := agent.GetAgent()
-
 	opts := []compose.Option{
 		compose.WithStateModifier(func(ctx context.Context, path compose.NodePath, s any) error {
 			st := s.(*model.State)
@@ -60,8 +58,6 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 					st.Messages = append(st.Messages, req.Messages...)
 				}
 			}
-			// 捕获 Coordinator 的路由标记
-			routedToCheckin = st.RouteToCheckin
 			return nil
 		}),
 	}
@@ -91,11 +87,13 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 			if recvErr != io.EOF {
 				_ = sse.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "stream failed: " + recvErr.Error()})
 			}
-			// EOF: 检查 Coordinator 的打卡路由标记
-			if recvErr == io.EOF && routedToCheckin && req.Messages != nil {
-				resp, cerr := agent.RunCheckin(context.Background(), req.Messages, req.ThreadID)
-				if cerr == nil {
-					_ = sse.WriteEvent("message", &model.ChatResp{Role: "assistant", Content: resp.Content})
+			// EOF: checkin routing signal from Coordinator
+			if recvErr == io.EOF {
+				if _, ok := agent.CheckinThreads.LoadAndDelete(req.ThreadID); ok {
+					resp, cerr := agent.RunCheckin(context.Background(), req.Messages, req.ThreadID)
+					if cerr == nil {
+						_ = sse.WriteEvent("message", &model.ChatResp{Role: "assistant", Content: resp.Content})
+					}
 				}
 			}
 			return
