@@ -16,13 +16,21 @@
 FROM golang:1.25-alpine AS builder
 
 WORKDIR /src
-# 缓存依赖：先拷 mod 文件下载，再拷源码
 COPY go.mod go.sum ./
 RUN go mod download
+COPY . ./
+RUN CGO_ENABLED=0 go build -o /out/deep-agent .
 
-COPY . .
-# CGO_ENABLED=0：go-sql-driver/mysql 是纯 Go，多平台/静态链接更稳。
-RUN CGO_ENABLED=0 GOOS=linux go build -o /out/deep-agent .
+############################
+# frontend stage：构建 React 静态资源
+############################
+FROM node:22-alpine AS frontend-builder
+
+WORKDIR /src/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
 
 ############################
 # runtime stage
@@ -60,7 +68,8 @@ COPY internal/agent/ /app/internal/agent/
 COPY internal/tool/ /app/internal/tool/
 COPY internal/prompts/ /app/internal/prompts/
 COPY internal/store/schema.sql /app/internal/store/schema.sql
-COPY frontend/ /app/frontend/
+COPY --from=frontend-builder /src/frontend/dist/ /app/frontend/dist/
+COPY frontend/favicon.svg /app/frontend/favicon.svg
 
 # 暴露 server 模式监听端口（DEEPAGENT_MODE=server 时 listen :8741）
 EXPOSE 8741

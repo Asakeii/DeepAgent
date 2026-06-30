@@ -13,6 +13,7 @@ import (
 	"deepAgent/internal/consts"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
+	deeptool "deepAgent/internal/tool"
 )
 
 func runBackgroundInvestigation(ctx context.Context, state *model.State) error {
@@ -46,6 +47,12 @@ func runBackgroundInvestigation(ctx context.Context, state *model.State) error {
 }
 
 func findSearchTool(ctx context.Context) (tool.InvokableTool, error) {
+	if native, err := deeptool.NewWebSearchTool(ctx); err == nil {
+		if searchTool, ok := native.(tool.InvokableTool); ok {
+			return searchTool, nil
+		}
+	}
+
 	for _, cli := range infra.MCPServer {
 		tools, err := einomcp.GetTools(ctx, &einomcp.Config{Cli: cli})
 		if err != nil {

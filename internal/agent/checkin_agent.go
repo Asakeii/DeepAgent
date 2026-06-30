@@ -3,12 +3,14 @@ package agent
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
 
 	"deepAgent/internal/infra"
+	"deepAgent/internal/scheduler"
 	"deepAgent/internal/tool"
 )
 
@@ -16,9 +18,20 @@ import (
 // agent 使用 infra.ChatModel + 打卡工具集；MessageModifier 在调用前注入 system prompt。
 // threadID 通过 context.WithValue(tool.CtxKeyThreadID, tid) 在调用 agent.Generate 时传入。
 func NewCheckinAgent(ctx context.Context, threadID string) (*react.Agent, error) {
-	tools, err := tool.CheckinTools(ctx, infra.DB, infra.VisionModel, threadID)
+	useScheduler := infra.RDB != nil
+	tools, err := tool.CheckinToolsWithOptions(ctx, infra.DB, infra.VisionModel, threadID, !useScheduler)
 	if err != nil {
 		return nil, fmt.Errorf("build checkin tools: %w", err)
+	}
+
+	// Redis-based reminder tools (schedule_reminder, cancel_reminder, list_reminders)
+	if useScheduler {
+		rt, err := scheduler.Tools(ctx, infra.RDB, threadID)
+		if err != nil {
+			log.Printf("[checkin] scheduler tools: %v", err)
+		} else {
+			tools = append(tools, rt...)
+		}
 	}
 
 	agent, err := react.NewAgent(ctx, &react.AgentConfig{

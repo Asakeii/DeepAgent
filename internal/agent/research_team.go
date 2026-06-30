@@ -27,13 +27,12 @@ func RunResearchTeam(ctx context.Context, state *model.State) error {
 		switch step.StepType {
 		case model.Research:
 			state.Goto = consts.Researcher
+			return nil
 		case model.Processing:
 			state.Goto = consts.Coder
-		default:
-			state.Goto = consts.Reporter
+			return nil
 		}
-
-		return nil
+		// Unknown step types: skip and continue to next step (matching deer-go)
 	}
 
 	if state.PlanIterations >= state.MaxPlanIterations {

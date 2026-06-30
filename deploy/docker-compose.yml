@@ -1,10 +1,3 @@
-# 一键起 MySQL + deepAgent 的 compose 定义。
-# 所有相对路径以本文件所在目录（deploy/）为基准。
-#   - mysql:8 初始化时把 internal/store/schema.sql 挂进 /docker-entrypoint-initdb.d 自动建表
-#   - deepagent: 本地 Dockerfile 构建；depends_on 等 mysql 健康后再起；配置走 volume 挂载
-#
-# 用法：
-#   docker compose -f deploy/docker-compose.yml up -d --build
 services:
   mysql:
     image: mysql:8
@@ -14,36 +7,58 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      # 首次启动时自动执行建表 SQL（mysql:8 镜像会按文件名顺序跑 /docker-entrypoint-initdb.d/*.sql）
       - ../internal/store/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
       - mysql-data:/var/lib/mysql
     healthcheck:
-      # mysqladmin ping 返回 mysqld is alive 即视为健康
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pdeepagent"]
       interval: 5s
       timeout: 3s
       retries: 20
 
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+
+  searxng:
+    image: searxng/searxng:latest
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080/
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/search?q=test&format=json"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   deepagent:
     build:
-      # context 为项目根，Dockerfile 需从根拷 go.mod / mcps / internal 等
       context: ..
       dockerfile: deploy/Dockerfile
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      searxng:
+        condition: service_healthy
     environment:
       DEEPAGENT_MODE: server
-      # 打印已加载 MCP 工具，便于在日志里确认 python/tavily 工具数
       DEEPAGENT_DEBUG_MCP: "true"
-      # 微信公众号 Token，用于回调 URL 签名验证。替换为你的真实 Token
       WECHAT_TOKEN: "your_wechat_token_here"
+      SEARXNG_URL: "http://searxng:8080"
+      REDIS_URL: "redis:6379"
     ports:
-      # 宿主 8088 → 容器内 8741
       - "8741:8741"
     volumes:
-      # 真实配置（含 key、容器内 DSN）通过 volume 注入，不烤进镜像
       - ../conf/deep-agent.yaml:/app/conf/deep-agent.yaml:ro
 
 volumes:
   mysql-data:
+  redis-data:

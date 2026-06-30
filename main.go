@@ -18,7 +18,7 @@ import (
 	"deepAgent/internal/handler"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
-	"deepAgent/internal/store"
+	"deepAgent/internal/scheduler"
 	"deepAgent/internal/tool"
 )
 
@@ -33,9 +33,14 @@ func main() {
 	if err := infra.InitDB(ctx); err != nil {
 		log.Fatal(err)
 	}
-	// 启动无状态提醒 ticker（每分钟扫 MySQL 表，抢锁触发到期提醒）
-	tickerStop := store.StartReminderTicker(infra.DB)
-	defer tickerStop()
+	// Redis 提醒调度器（秒级精度，ZSET 队列 + connRegistry SSE 推送）
+	if err := infra.InitRedis(ctx); err != nil {
+		log.Printf("[redis] %v — reminders disabled", err)
+	}
+	if infra.RDB != nil {
+		sw := scheduler.Start(ctx, infra.RDB, scheduler.DefaultRegistry)
+		defer sw.Stop()
+	}
 	if err := infra.InitModel(ctx); err != nil {
 		log.Fatal(err)
 	}
@@ -184,7 +189,10 @@ func runServer() {
 	// 前端静态文件
 	mux.HandleFunc("/api/sessions", handler.ListSessions)
 	mux.HandleFunc("/api/messages", handler.LoadMessages)
-	mux.Handle("/", http.FileServer(http.Dir("frontend")))
+	mux.HandleFunc("/api/reminders", handler.ListReminders)
+	mux.HandleFunc("/api/reminders/cancel", handler.CancelReminder)
+	mux.HandleFunc("/api/reminders/toggle", handler.ToggleReminder)
+	mux.Handle("/", spaFileServer(frontendDir()))
 
 	addr := ":8741"
 	log.Printf("deepAgent server listening on %s", addr)
@@ -203,5 +211,28 @@ func withCORS(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+func frontendDir() string {
+	if _, err := os.Stat("frontend/dist/index.html"); err == nil {
+		return "frontend/dist"
+	}
+	return "frontend"
+}
+
+func spaFileServer(dir string) http.Handler {
+	files := http.FileServer(http.Dir(dir))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			files.ServeHTTP(w, r)
+			return
+		}
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		if _, err := os.Stat(dir + "/" + path); err == nil {
+			files.ServeHTTP(w, r)
+			return
+		}
+		http.ServeFile(w, r, dir+"/index.html")
 	})
 }

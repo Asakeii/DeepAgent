@@ -13,7 +13,7 @@ type ChatRequest struct {
 	AutoAcceptedPlan              bool              `json:"auto_accepted_plan,omitempty"`
 	InterruptFeedback             string            `json:"interrupt_feedback,omitempty"`
 	MCPSettings                   map[string]any    `json:"mcp_settings,omitempty"`
-	EnableBackgroundInvestigation bool              `json:"enable_background_investigation,omitempty"`
+	EnableBackgroundInvestigation *bool             `json:"enable_background_investigation,omitempty"`
 	ImageBase64                   string            `json:"image_base64,omitempty"`
 }
 
@@ -31,6 +31,39 @@ type ToolChunkResp struct {
 	Args string `json:"args,omitempty"`
 }
 
+type ReminderResp struct {
+	ID        string `json:"id,omitempty"`
+	ThreadID  string `json:"thread_id,omitempty"`
+	Message   string `json:"message,omitempty"`
+	FireAt    int64  `json:"fire_at,omitempty"`
+	Cron      string `json:"cron,omitempty"`
+	Recurring bool   `json:"recurring,omitempty"`
+	Status    string `json:"status,omitempty"`
+}
+
+type CancelReminderRequest struct {
+	ThreadID   string `json:"thread_id"`
+	ReminderID string `json:"reminder_id"`
+}
+
+type ToggleReminderRequest struct {
+	ThreadID   string `json:"thread_id"`
+	ReminderID string `json:"reminder_id"`
+	Active     bool   `json:"active"`
+}
+
+type CancelReminderResponse struct {
+	Reminder *ReminderResp `json:"reminder"`
+}
+
+type ToggleReminderResponse struct {
+	Reminder *ReminderResp `json:"reminder"`
+}
+
+type ListRemindersResponse struct {
+	Reminders []*ReminderResp `json:"reminders"`
+}
+
 // ChatResp 是 SSE 事件里返回给前端的统一消息结构。
 type ChatResp struct {
 	ThreadID       string           `json:"thread_id,omitempty"`
@@ -38,10 +71,12 @@ type ChatResp struct {
 	ID             string           `json:"id,omitempty"`
 	Role           string           `json:"role,omitempty"`
 	Content        string           `json:"content,omitempty"`
+	Plan           *Plan            `json:"plan,omitempty"`
 	FinishReason   string           `json:"finish_reason,omitempty"`
 	Options        []map[string]any `json:"options,omitempty"`
 	ToolCallID     string           `json:"tool_call_id,omitempty"`
 	ToolCalls      []ToolResp       `json:"tool_calls,omitempty"`
 	ToolCallChunks []ToolChunkResp  `json:"tool_call_chunks,omitempty"`
 	MessageChunks  any              `json:"message_chunks,omitempty"`
+	Reminder       *ReminderResp    `json:"reminder,omitempty"`
 }

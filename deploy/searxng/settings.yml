@@ -1,0 +1,54 @@
+# SearXNG settings for deepAgent web search tool
+# See: https://docs.searxng.org/admin/settings/
+
+use_default_settings: true
+
+general:
+  instance_name: "deepAgent Search"
+  debug: false
+  privacypolicy_url: false
+  contact_url: false
+  enable_metrics: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: ""
+  formats:
+    - html
+    - json
+
+server:
+  secret_key: "deepagent-searxng-secret-change-in-production"
+  bind_address: "0.0.0.0"
+  port: 8080
+  limiter: false
+  image_proxy: false
+
+ui:
+  enabled: true
+  static_use_hash: true
+
+redis:
+  url: false
+
+outgoing:
+  request_timeout: 10.0
+  max_request_timeout: 15.0
+  useragent_suffix: ""
+  # Using requests without proxies - rate limiting is handled by the engines themselves
+  using_tor_proxy: false
+
+engines:
+  # Keep only the most reliable free engines
+  - name: duckduckgo
+    disabled: false
+  - name: wikipedia
+    disabled: false
+  - name: brave
+    disabled: false
+  # Disable engines that require API keys
+  - name: google
+    disabled: true
+  - name: bing
+    disabled: true

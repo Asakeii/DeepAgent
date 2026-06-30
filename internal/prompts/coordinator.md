@@ -34,7 +34,7 @@ Your primary responsibilities are:
    - Food images: messages with file paths or pasted images
    - Logging study: "读了1小时书"
    - Queries: "查看打卡记录", "这周总结", "最近运动情况"
-   - Reminders: "设置每天8点提醒我喝水"
+   - Reminders: "设置每天8点提醒我喝水", "今晚九点提醒我下班", "帮我记一下今晚九点下班", "明早叫我开会"
    - ⚠️ Do NOT route to checkin: "帮我制定减肥计划", "如何科学减脂", "给我一个运动方案" — these require research/investigation → planner
 
 # Execution Rules
@@ -53,4 +53,5 @@ Your primary responsibilities are:
 - Always maintain the same language as the user
 - **When in doubt between checkin and research, prefer planner** — research is the safer default
 - Key distinction: "制定方案/研究如何做" → planner; "记录今天做了什么" → checkin
+- Key distinction: if the user asks you to remember/remind/call/notify them at a future time, it is a reminder task, even if they say "记一下"; route to checkin instead of asking for a check-in category.
 - File paths in messages strongly indicate food image analysis → checkin

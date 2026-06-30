@@ -6,13 +6,18 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/cloudwego/eino/compose"
+	"github.com/cloudwego/eino/schema"
 
+	"deepAgent/conf"
 	"deepAgent/internal/agent"
 	"deepAgent/internal/consts"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
+	"deepAgent/internal/scheduler"
 )
 
 // ChatStreamEino 是 deepAgent 的 SSE 接口。
@@ -33,6 +38,23 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 		req.InterruptFeedback = NormalizeInterruptFeedback(req.InterruptFeedback)
 	}
 
+	// Register SSE connection for reminder delivery
+	if req.ThreadID != "" && infra.RDB != nil {
+		notifCh := scheduler.DefaultRegistry.Register(req.ThreadID)
+		defer scheduler.DefaultRegistry.Unregister(req.ThreadID)
+		scheduler.DrainPending(ctx, infra.RDB, req.ThreadID, notifCh)
+		go func() {
+			for event := range notifCh {
+				_ = sse.WriteEvent("reminder", &model.ChatResp{
+					ThreadID: req.ThreadID,
+					Role:     "assistant",
+					Content:  "提醒：" + event.Message,
+					Reminder: reminderResp(event),
+				})
+			}
+		}()
+	}
+
 	// 图片粘贴：直接调用 VisionModel 分析，返回结果
 	if req.ImageBase64 != "" && len(req.Messages) > 0 {
 		txt := req.Messages[len(req.Messages)-1].Content
@@ -45,6 +67,25 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	maxPlanIterations := req.MaxPlanIterations
+	if maxPlanIterations <= 0 {
+		maxPlanIterations = conf.App.Setting.MaxPlanIterations
+	}
+	if maxPlanIterations <= 0 {
+		maxPlanIterations = 1
+	}
+	maxStepNum := req.MaxStepNum
+	if maxStepNum <= 0 {
+		maxStepNum = conf.App.Setting.MaxStepNum
+	}
+	if maxStepNum <= 0 {
+		maxStepNum = 3
+	}
+	enableBackgroundInvestigation := conf.App.Setting.EnableBackgroundInvestigation
+	if req.EnableBackgroundInvestigation != nil {
+		enableBackgroundInvestigation = *req.EnableBackgroundInvestigation
+	}
+
 	// per-request Builder + genFunc（对齐 deer-go）：genFunc 在编译时创建 State，
 	// sub-graph 节点通过 GenLocalState 继承正确的 Messages。
 	genFunc := func(ctx context.Context) *model.State {
@@ -52,10 +93,10 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 			Messages:                      req.Messages,
 			Goto:                          consts.Coordinator,
 			Locale:                        "zh-CN",
-			MaxPlanIterations:             req.MaxPlanIterations,
-			MaxStepNum:                    req.MaxStepNum,
+			MaxPlanIterations:             maxPlanIterations,
+			MaxStepNum:                    maxStepNum,
 			AutoAcceptedPlan:              req.AutoAcceptedPlan,
-			EnableBackgroundInvestigation: req.EnableBackgroundInvestigation,
+			EnableBackgroundInvestigation: enableBackgroundInvestigation,
 			ThreadID:                      req.ThreadID,
 		}
 	}
@@ -80,7 +121,8 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 			return nil
 		}))
 	}
-	opts = append(opts, compose.WithCallbacks(&infra.LoggerCallback{ID: req.ThreadID, SSE: sse}))
+	finalCh := make(chan string, 1)
+	opts = append(opts, compose.WithCallbacks(&infra.LoggerCallback{ID: req.ThreadID, SSE: sse, Final: finalCh}))
 
 	out, err := runnable.Stream(ctx, consts.Coordinator, opts...)
 	if err != nil {
@@ -93,6 +135,7 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 	}
 	defer out.Close()
 
+	lastGraphMsg := ""
 	for {
 		msg, recvErr := out.Recv()
 		if recvErr != nil {
@@ -106,22 +149,79 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 			// EOF: checkin routing signal from Coordinator
 			if recvErr == io.EOF {
 				if _, ok := agent.CheckinThreads.LoadAndDelete(req.ThreadID); ok {
-					resp, cerr := agent.RunCheckin(context.Background(), req.Messages, req.ThreadID)
+					var reminderEvents []scheduler.ReminderEvent
+					var reminderMu sync.Mutex
+					checkinCtx := scheduler.WithEventSink(ctx, func(event scheduler.ReminderEvent) {
+						reminderMu.Lock()
+						defer reminderMu.Unlock()
+						reminderEvents = append(reminderEvents, event)
+					})
+					resp, cerr := agent.RunCheckin(checkinCtx, req.Messages, req.ThreadID)
 					if cerr == nil {
+						reminderMu.Lock()
+						events := append([]scheduler.ReminderEvent(nil), reminderEvents...)
+						reminderMu.Unlock()
+						for _, event := range events {
+							_ = sse.WriteEvent("reminder_scheduled", &model.ChatResp{
+								ThreadID: req.ThreadID,
+								Role:     "assistant",
+								Content:  event.Message,
+								Reminder: reminderResp(event),
+							})
+						}
 						_ = sse.WriteEvent("message", &model.ChatResp{Role: "assistant", Content: resp.Content})
 					}
+				} else {
+					final := waitFinalMessage(finalCh)
+					if final == "" {
+						final = lastGraphMsg
+					}
+					persistResearchMessages(ctx, req.ThreadID, req.Messages, final)
 				}
 			}
 			return
 		}
-		if strings.TrimSpace(msg) == "" {
-			continue
+		if strings.TrimSpace(msg) != "" {
+			lastGraphMsg = msg
 		}
-		_ = sse.WriteEvent("message", &model.ChatResp{Role: "assistant", Content: msg})
+	}
+}
+
+func reminderResp(event scheduler.ReminderEvent) *model.ReminderResp {
+	return &model.ReminderResp{
+		ID:        event.ID,
+		ThreadID:  event.ThreadID,
+		Message:   event.Message,
+		FireAt:    event.FireAt,
+		Cron:      event.Cron,
+		Recurring: event.Recurring,
+		Status:    event.Status,
 	}
 }
 
 // NormalizeInterruptFeedback 统一中断反馈值。
 func NormalizeInterruptFeedback(v string) string {
 	return strings.ToLower(strings.TrimSpace(v))
+}
+
+func waitFinalMessage(ch <-chan string) string {
+	select {
+	case msg := <-ch:
+		return msg
+	case <-time.After(500 * time.Millisecond):
+		return ""
+	}
+}
+
+func persistResearchMessages(ctx context.Context, threadID string, msgs []*schema.Message, final string) {
+	if threadID == "" || final == "" {
+		return
+	}
+	for _, msg := range msgs {
+		if msg == nil || msg.Role != schema.User || strings.TrimSpace(msg.Content) == "" {
+			continue
+		}
+		_ = infra.AppendMessageForCheckin(ctx, threadID, string(schema.User), msg.Content)
+	}
+	_ = infra.AppendMessageForCheckin(ctx, threadID, string(schema.Assistant), final)
 }

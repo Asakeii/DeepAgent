@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	einomcp "github.com/cloudwego/eino-ext/components/tool/mcp"
 	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
@@ -16,6 +15,7 @@ import (
 	"deepAgent/internal/consts"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
+	deeptool "deepAgent/internal/tool"
 )
 
 // RunResearcher 是教学阶段的独立 Researcher。
@@ -135,14 +135,12 @@ func modifyResearcherInput(ctx context.Context, input []*schema.Message) []*sche
 func NewResearcher[I, O any](ctx context.Context) *compose.Graph[I, O] {
 	researchTools := []tool.BaseTool{}
 
-	// Researcher 使用全部 MCP server 暴露的工具；Coder 则只使用 python 开头的工具。
-	for _, cli := range infra.MCPServer {
-		ts, err := einomcp.GetTools(ctx, &einomcp.Config{Cli: cli})
-		if err != nil {
-			continue
-		}
-
-		researchTools = append(researchTools, ts...)
+	// Native web search tools (SearXNG) — self-hosted, no API key required.
+	if ws, err := deeptool.NewWebSearchTool(ctx); err == nil {
+		researchTools = append(researchTools, ws)
+	}
+	if wf, err := deeptool.NewWebFetchTool(ctx); err == nil {
+		researchTools = append(researchTools, wf)
 	}
 
 	// ReAct Agent 会在“模型思考 -> 工具调用 -> 观察结果”之间循环，直到得到最终回答或达到 MaxStep。

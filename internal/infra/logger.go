@@ -69,6 +69,9 @@ type LoggerCallback struct {
 	ID  string
 	SSE *SSEWriter
 	Out chan string
+	// Final receives completed assistant messages for persistence.
+	// It is intentionally best-effort so callback goroutines never block the graph.
+	Final chan string
 }
 
 func (cb *LoggerCallback) push(ctx context.Context, event string, data *model.ChatResp) error {
@@ -81,6 +84,15 @@ func (cb *LoggerCallback) push(ctx context.Context, event string, data *model.Ch
 		cb.Out <- data.Content
 	}
 	return nil
+}
+
+func isHiddenAssistantContent(content string) bool {
+	switch strings.ToLower(strings.TrimSpace(content)) {
+	case "", "end", "processed":
+		return true
+	default:
+		return false
+	}
 }
 
 func (cb *LoggerCallback) pushMsg(ctx context.Context, msgID string, msg *schema.Message) error {
@@ -119,12 +131,71 @@ func (cb *LoggerCallback) pushMsg(ctx context.Context, msgID string, msg *schema
 		return cb.pushToolCall(ctx, data, msg.ToolCalls)
 	}
 
-	if strings.TrimSpace(msg.Content) == "" {
+	if isHiddenAssistantContent(msg.Content) {
 		return nil
 	}
 
 	data.Role = "assistant"
 	return cb.push(ctx, "message_chunk", data)
+}
+
+func (cb *LoggerCallback) agentName(ctx context.Context) string {
+	agentName := ""
+	_ = compose.ProcessState[*model.State](ctx, func(ctx context.Context, state *model.State) error {
+		agentName = state.Goto
+		return nil
+	})
+	return agentName
+}
+
+func (cb *LoggerCallback) pushPlan(ctx context.Context, content string) {
+	content = stripJSONFence(content)
+	if strings.TrimSpace(content) == "" {
+		return
+	}
+	var plan model.Plan
+	if err := json.Unmarshal([]byte(content), &plan); err != nil {
+		return
+	}
+	_ = cb.push(ctx, "plan", &model.ChatResp{
+		ThreadID: cb.ID,
+		Agent:    "planner",
+		Role:     "assistant",
+		Plan:     &plan,
+	})
+}
+
+func (cb *LoggerCallback) pushFinal(ctx context.Context, agentName, content string) {
+	content = strings.TrimSpace(content)
+	if isHiddenAssistantContent(content) {
+		return
+	}
+	_ = cb.push(ctx, "final_message", &model.ChatResp{
+		ThreadID: cb.ID,
+		Agent:    agentName,
+		Role:     "assistant",
+		Content:  content,
+	})
+	if cb.Final != nil {
+		select {
+		case cb.Final <- content:
+		default:
+		}
+	}
+}
+
+func stripJSONFence(content string) string {
+	s := strings.TrimSpace(content)
+	if !strings.HasPrefix(s, "```") {
+		return s
+	}
+	if nl := strings.IndexByte(s, '\n'); nl > 0 {
+		s = strings.TrimSpace(s[nl+1:])
+	}
+	if idx := strings.LastIndex(s, "```"); idx >= 0 {
+		s = strings.TrimSpace(s[:idx])
+	}
+	return s
 }
 
 func (cb *LoggerCallback) pushToolCall(ctx context.Context, data *model.ChatResp, toolCalls []schema.ToolCall) error {
@@ -191,12 +262,20 @@ func (cb *LoggerCallback) OnEndWithStreamOutput(
 	output *schema.StreamReader[callbacks.CallbackOutput],
 ) context.Context {
 	msgID := newMsgID()
+	agentName := cb.agentName(ctx)
 
 	go func() {
 		defer output.Close()
+		var content strings.Builder
 		for {
 			frame, err := output.Recv()
 			if errors.Is(err, io.EOF) {
+				switch agentName {
+				case "planner":
+					cb.pushPlan(ctx, content.String())
+				case "reporter", "coordinator":
+					cb.pushFinal(ctx, agentName, content.String())
+				}
 				return
 			}
 			if err != nil {
@@ -210,12 +289,27 @@ func (cb *LoggerCallback) OnEndWithStreamOutput(
 
 			switch v := frame.(type) {
 			case *schema.Message:
-				_ = cb.pushMsg(ctx, msgID, v)
+				if v != nil && v.Role == schema.Assistant && len(v.ToolCalls) == 0 {
+					content.WriteString(v.Content)
+				}
+				if agentName != "planner" {
+					_ = cb.pushMsg(ctx, msgID, v)
+				}
 			case *ecmodel.CallbackOutput:
-				_ = cb.pushMsg(ctx, msgID, v.Message)
+				if v.Message != nil && v.Message.Role == schema.Assistant && len(v.Message.ToolCalls) == 0 {
+					content.WriteString(v.Message.Content)
+				}
+				if agentName != "planner" {
+					_ = cb.pushMsg(ctx, msgID, v.Message)
+				}
 			case []*schema.Message:
 				for _, msg := range v {
-					_ = cb.pushMsg(ctx, msgID, msg)
+					if msg != nil && msg.Role == schema.Assistant && len(msg.ToolCalls) == 0 {
+						content.WriteString(msg.Content)
+					}
+					if agentName != "planner" {
+						_ = cb.pushMsg(ctx, msgID, msg)
+					}
 				}
 			}
 		}

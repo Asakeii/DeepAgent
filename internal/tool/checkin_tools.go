@@ -53,11 +53,16 @@ func AnalyzeFoodDirect(ctx context.Context, imageB64, text, threadID string, db 
 func mealCategory() string {
 	h := time.Now().Hour()
 	switch {
-	case h >= 5 && h < 10: return "早餐"
-	case h >= 10 && h < 14: return "午餐"
-	case h >= 14 && h < 17: return "下午茶"
-	case h >= 17 && h < 22: return "晚餐"
-	default: return "夜宵"
+	case h >= 5 && h < 10:
+		return "早餐"
+	case h >= 10 && h < 14:
+		return "午餐"
+	case h >= 14 && h < 17:
+		return "下午茶"
+	case h >= 17 && h < 22:
+		return "晚餐"
+	default:
+		return "夜宵"
 	}
 }
 
@@ -76,13 +81,17 @@ func analyzeFoodWithCategory(ctx context.Context, in analyzeInput, db *sql.DB, v
 
 func foodNames(foods []foodItem) []any {
 	out := make([]any, len(foods))
-	for i, f := range foods { out[i] = f.Name }
+	for i, f := range foods {
+		out[i] = f.Name
+	}
 	return out
 }
 
 func placeholders(n int) string {
 	ps := make([]string, n)
-	for i := range ps { ps[i] = "?" }
+	for i := range ps {
+		ps[i] = "?"
+	}
 	return strings.Join(ps, ",")
 }
 
@@ -211,6 +220,12 @@ func joinStrings(ss []string, sep string) string {
 // CheckinTools 返回 checkin agent 使用的全部工具。
 // db 和 visionModel 由调用方注入；threadID 通过 context.WithValue(ctxKeyThreadID{}, tid) 在调用时传入。
 func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel, threadID string) ([]tool.BaseTool, error) {
+	return CheckinToolsWithOptions(ctx, db, visionModel, threadID, true)
+}
+
+// CheckinToolsWithOptions returns check-in tools and can omit legacy MySQL
+// reminder tools when the Redis scheduler is available.
+func CheckinToolsWithOptions(ctx context.Context, db *sql.DB, visionModel model.ChatModel, threadID string, includeLegacyReminders bool) ([]tool.BaseTool, error) {
 	var tools []tool.BaseTool
 
 	rc, err := utils.InferTool("record_checkin",
@@ -256,6 +271,10 @@ func CheckinTools(ctx context.Context, db *sql.DB, visionModel model.ChatModel, 
 		return nil, fmt.Errorf("infer analyze_food: %w", err)
 	}
 	tools = append(tools, af)
+
+	if !includeLegacyReminders {
+		return tools, nil
+	}
 
 	cr, err := utils.InferTool("create_reminder",
 		"创建一个定时提醒（每天/每周提醒等），用户说'每天8点提醒我喝水'时调用",
