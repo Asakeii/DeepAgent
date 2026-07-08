@@ -2,12 +2,14 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
 	"github.com/cloudwego/eino/schema"
 
 	"deepAgent/internal/app"
+	"deepAgent/internal/infra"
 	"deepAgent/internal/store"
 )
 
@@ -32,6 +34,13 @@ func OpenAICompatible(w http.ResponseWriter, r *http.Request) {
 	if userID == store.AnonymousUserID {
 		userID = "openai:" + threadID
 	}
+	runID := strings.TrimSpace(req.RunID)
+	if runID == "" {
+		runID = strings.TrimSpace(r.Header.Get("X-DeepAgent-Run"))
+	}
+	if runID == "" {
+		runID = app.NewRunID()
+	}
 
 	msgs := make([]*schema.Message, len(req.Messages))
 	for i, m := range req.Messages {
@@ -45,20 +54,31 @@ func OpenAICompatible(w http.ResponseWriter, r *http.Request) {
 		msgs[i] = &schema.Message{Role: role, Content: m.Content}
 	}
 
+	if err := store.CreateRun(r.Context(), infra.DB, store.RunRecord{
+		ID:       runID,
+		UserID:   userID,
+		ThreadID: threadID,
+		Mode:     "openai",
+	}); err != nil {
+		log.Printf("[openai] create run=%s thread=%s: %v", runID, threadID, err)
+	}
 	resp, err := app.NewCheckinService().RunTurn(r.Context(), app.CheckinTurnRequest{
+		RunID:    runID,
 		UserID:   userID,
 		ThreadID: threadID,
 		Messages: msgs,
 	})
 	if err != nil {
-		writeOpenAICompletions(w, err.Error())
+		_ = store.CompleteRun(r.Context(), infra.DB, runID, store.RunStatusFailed, err.Error())
+		writeOpenAICompletions(w, runID, err.Error())
 		return
 	}
+	_ = store.CompleteRun(r.Context(), infra.DB, runID, store.RunStatusSucceeded, "")
 	content := ""
 	if resp.Response != nil {
 		content = resp.Response.Content
 	}
-	writeOpenAICompletions(w, content)
+	writeOpenAICompletions(w, runID, content)
 }
 
 // ---- OpenAI-compatible types ----
@@ -66,6 +86,7 @@ func OpenAICompatible(w http.ResponseWriter, r *http.Request) {
 type ChatCompletionRequest struct {
 	Model    string        `json:"model"`
 	Messages []ChatMessage `json:"messages"`
+	RunID    string        `json:"run_id,omitempty"`
 	ThreadID string        `json:"thread_id,omitempty"`
 }
 
@@ -87,12 +108,15 @@ type chatCompletionChoice struct {
 	FinishReason string      `json:"finish_reason"`
 }
 
-func writeOpenAICompletions(w http.ResponseWriter, content string) {
+func writeOpenAICompletions(w http.ResponseWriter, id, content string) {
 	if content == "" {
 		content = "processed"
 	}
+	if id == "" {
+		id = app.NewRunID()
+	}
 	resp := chatCompletionResponse{
-		ID:     "chatcmpl-deepagent",
+		ID:     id,
 		Object: "chat.completion",
 		Model:  "deepagent",
 		Choices: []chatCompletionChoice{{

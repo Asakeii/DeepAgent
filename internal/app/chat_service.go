@@ -7,6 +7,7 @@ import (
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
 	"deepAgent/internal/store"
+	"deepAgent/internal/toolruntime"
 )
 
 // ChatService orchestrates one chat turn while keeping transport handlers thin.
@@ -57,6 +58,11 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 		log.Printf("[run] create run=%s thread=%s: %v", req.RunID, req.ThreadID, err)
 	}
 	runWriter := NewRunEventWriter(infra.DB, req.RunID, req.ThreadID, req.UserID, writer)
+	toolCtx := toolruntime.WithAuditContext(ctx, toolruntime.AuditContext{
+		RunID:    req.RunID,
+		ThreadID: req.ThreadID,
+		UserID:   req.UserID,
+	})
 	defer func() {
 		status := store.RunStatusSucceeded
 		errText := ""
@@ -73,7 +79,7 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 	defer detach()
 
 	if req.ImageBase64 != "" {
-		resp, err := s.Checkin.AnalyzeImage(ctx, req)
+		resp, err := s.Checkin.AnalyzeImage(toolCtx, req)
 		if err != nil {
 			_ = runWriter.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "分析失败: " + err.Error()})
 			return
@@ -82,12 +88,13 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 		return
 	}
 
-	result, err := s.Research.Run(ctx, req, runWriter)
+	result, err := s.Research.Run(toolCtx, req, runWriter)
 	if err != nil {
 		return
 	}
 	if result.RouteToCheckin {
-		checkinResult, err := s.Checkin.RunTurn(ctx, CheckinTurnRequest{
+		checkinResult, err := s.Checkin.RunTurn(toolCtx, CheckinTurnRequest{
+			RunID:    req.RunID,
 			UserID:   req.UserID,
 			ThreadID: req.ThreadID,
 			Messages: req.Messages,

@@ -183,6 +183,7 @@ func runServer() {
 	mux.HandleFunc("/api/sessions", handler.ListSessions)
 	mux.HandleFunc("/api/messages", handler.LoadMessages)
 	mux.HandleFunc("/api/run-events", handler.ListRunEvents)
+	mux.HandleFunc("/api/tool-audits", handler.ListToolAudits)
 	mux.HandleFunc("/api/reminders", handler.ListReminders)
 	mux.HandleFunc("/api/reminders/cancel", handler.CancelReminder)
 	mux.HandleFunc("/api/reminders/toggle", handler.ToggleReminder)
@@ -198,8 +199,8 @@ func runServer() {
 func withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-DeepAgent-User, X-DeepAgent-Run")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return

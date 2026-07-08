@@ -18,6 +18,7 @@ import (
 	"deepAgent/internal/consts"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
+	"deepAgent/internal/toolruntime"
 )
 
 // RunCoder 是教学阶段的独立 Coder（不经过 Eino 子图）。
@@ -176,6 +177,7 @@ func NewCoder[I, O any](ctx context.Context) *compose.Graph[I, O] {
 
 		coderTools = append(coderTools, ts...)
 	}
+	coderTools = toolruntime.WrapTools(infra.DB, coderTools, toolruntime.DefaultPolicy())
 
 	// ReAct Agent：模型 ↔ tool call 可多轮循环，最多 MaxStep 轮
 	agent, err := react.NewAgent(ctx, &react.AgentConfig{

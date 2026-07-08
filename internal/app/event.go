@@ -165,6 +165,10 @@ func (w *RunEventWriter) record(event string, payload any) {
 }
 
 func newRunID() string {
+	return NewRunID()
+}
+
+func NewRunID() string {
 	var b [12]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		return "run"

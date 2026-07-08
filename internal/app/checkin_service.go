@@ -13,11 +13,13 @@ import (
 	"deepAgent/internal/model"
 	"deepAgent/internal/scheduler"
 	"deepAgent/internal/store"
+	"deepAgent/internal/toolruntime"
 )
 
 type CheckinService struct{}
 
 type CheckinTurnRequest struct {
+	RunID    string
 	UserID   string
 	ThreadID string
 	Messages []*schema.Message
@@ -48,6 +50,11 @@ func (s *CheckinService) RunTurn(ctx context.Context, req CheckinTurnRequest) (C
 		reminderMu.Lock()
 		defer reminderMu.Unlock()
 		reminderEvents = append(reminderEvents, event)
+	})
+	checkinCtx = toolruntime.WithAuditContext(checkinCtx, toolruntime.AuditContext{
+		RunID:    req.RunID,
+		ThreadID: req.ThreadID,
+		UserID:   req.UserID,
 	})
 
 	resp, err := agent.RunCheckin(checkinCtx, req.Messages, req.ThreadID)

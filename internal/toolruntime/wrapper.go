@@ -109,11 +109,9 @@ func (t *baseTool) timeout() time.Duration {
 	return t.policy.DefaultTimeout
 }
 
-func (t *baseTool) before(ctx context.Context, name string, args string) (context.Context, int64, time.Time, Risk, error) {
+func (t *baseTool) before(ctx context.Context, name string, args string) (context.Context, context.CancelFunc, int64, time.Time, Risk, error) {
+	started := time.Now()
 	risk := t.risk(name)
-	if risk == RiskDangerous && !t.policy.AllowDangerous {
-		return ctx, 0, time.Now(), risk, fmt.Errorf("tool %s is dangerous and requires approval", name)
-	}
 	meta := AuditContextFrom(ctx)
 	payload := json.RawMessage(args)
 	if !json.Valid(payload) {
@@ -130,8 +128,11 @@ func (t *baseTool) before(ctx context.Context, name string, args string) (contex
 	if err != nil {
 		id = 0
 	}
-	child, _ := context.WithTimeout(ctx, t.timeout())
-	return child, id, time.Now(), risk, nil
+	if risk == RiskDangerous && !t.policy.AllowDangerous {
+		return ctx, func() {}, id, started, risk, fmt.Errorf("tool %s is dangerous and requires approval", name)
+	}
+	child, cancel := context.WithTimeout(ctx, t.timeout())
+	return child, cancel, id, started, risk, nil
 }
 
 func (t *baseTool) after(ctx context.Context, id int64, started time.Time, status string, result string, err error) {
@@ -149,11 +150,12 @@ type invokableTool struct {
 
 func (t *invokableTool) InvokableRun(ctx context.Context, args string, opts ...einotool.Option) (string, error) {
 	name := t.toolName(ctx)
-	child, auditID, started, _, policyErr := t.before(ctx, name, args)
+	child, cancel, auditID, started, _, policyErr := t.before(ctx, name, args)
 	if policyErr != nil {
 		t.after(ctx, auditID, started, store.ToolStatusBlocked, "", policyErr)
 		return toolErrorText(policyErr), nil
 	}
+	defer cancel()
 	result, err := t.invokable.InvokableRun(child, args, opts...)
 	status := store.ToolStatusSucceeded
 	if err != nil {
@@ -173,7 +175,7 @@ type streamableTool struct {
 
 func (t *streamableTool) StreamableRun(ctx context.Context, args string, opts ...einotool.Option) (*schema.StreamReader[string], error) {
 	name := t.toolName(ctx)
-	child, auditID, started, _, policyErr := t.before(ctx, name, args)
+	child, _, auditID, started, _, policyErr := t.before(ctx, name, args)
 	if policyErr != nil {
 		t.after(ctx, auditID, started, store.ToolStatusBlocked, "", policyErr)
 		return schema.StreamReaderFromArray([]string{toolErrorText(policyErr)}), nil

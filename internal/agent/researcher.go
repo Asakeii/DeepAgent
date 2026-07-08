@@ -16,6 +16,7 @@ import (
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
 	deeptool "deepAgent/internal/tool"
+	"deepAgent/internal/toolruntime"
 )
 
 // RunResearcher 是教学阶段的独立 Researcher。
@@ -142,6 +143,7 @@ func NewResearcher[I, O any](ctx context.Context) *compose.Graph[I, O] {
 	if wf, err := deeptool.NewWebFetchTool(ctx); err == nil {
 		researchTools = append(researchTools, wf)
 	}
+	researchTools = toolruntime.WrapTools(infra.DB, researchTools, toolruntime.DefaultPolicy())
 
 	// ReAct Agent 会在“模型思考 -> 工具调用 -> 观察结果”之间循环，直到得到最终回答或达到 MaxStep。
 	agent, err := react.NewAgent(ctx, &react.AgentConfig{

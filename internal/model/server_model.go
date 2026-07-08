@@ -80,6 +80,24 @@ type ListRunEventsResponse struct {
 	Events []*RunEventResp `json:"events"`
 }
 
+type ToolAuditResp struct {
+	ID         int64  `json:"id"`
+	RunID      string `json:"run_id"`
+	ThreadID   string `json:"thread_id"`
+	UserID     string `json:"user_id,omitempty"`
+	ToolName   string `json:"tool_name"`
+	Risk       string `json:"risk"`
+	Status     string `json:"status"`
+	Arguments  any    `json:"arguments,omitempty"`
+	Result     string `json:"result,omitempty"`
+	Error      string `json:"error,omitempty"`
+	DurationMS int64  `json:"duration_ms"`
+}
+
+type ListToolAuditsResponse struct {
+	Audits []*ToolAuditResp `json:"audits"`
+}
+
 // ChatResp 是 SSE 事件里返回给前端的统一消息结构。
 type ChatResp struct {
 	RunID          string           `json:"run_id,omitempty"`

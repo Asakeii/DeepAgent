@@ -12,6 +12,7 @@ import (
 	"deepAgent/internal/infra"
 	"deepAgent/internal/scheduler"
 	"deepAgent/internal/tool"
+	"deepAgent/internal/toolruntime"
 )
 
 // NewCheckinAgent 构造一个独立的 ReAct checkin agent（不入总图，直接 agent.Generate 调用）。
@@ -33,6 +34,7 @@ func NewCheckinAgent(ctx context.Context, threadID string) (*react.Agent, error)
 			tools = append(tools, rt...)
 		}
 	}
+	tools = toolruntime.WrapTools(infra.DB, tools, toolruntime.DefaultPolicy())
 
 	agent, err := react.NewAgent(ctx, &react.AgentConfig{
 		MaxStep:               40,
