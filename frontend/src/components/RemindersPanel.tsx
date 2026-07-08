@@ -6,23 +6,26 @@ interface RemindersPanelProps {
   loading: boolean;
   onRefresh: () => void;
   onToggle: (reminderId: string, active: boolean) => void;
+  showHeader?: boolean;
 }
 
-export function RemindersPanel({ reminders, loading, onRefresh, onToggle }: RemindersPanelProps) {
+export function RemindersPanel({ reminders, loading, onRefresh, onToggle, showHeader = true }: RemindersPanelProps) {
   return (
     <div className="panel-section reminders-section">
-      <div className="panel-heading">
-        <Bell size={16} />
-        <h2>当前定时任务</h2>
-        <button className="icon-button ghost panel-action" type="button" onClick={onRefresh} aria-label="刷新定时任务">
-          <RefreshCw className={loading ? "spin" : ""} size={15} />
-        </button>
-      </div>
+      {showHeader ? (
+        <div className="panel-heading">
+          <Bell size={16} />
+          <h2>当前定时任务</h2>
+          <button className="icon-button ghost panel-action" type="button" onClick={onRefresh} aria-label="刷新定时任务">
+            <RefreshCw className={loading ? "spin" : ""} size={15} />
+          </button>
+        </div>
+      ) : null}
 
       {reminders.length === 0 ? (
         <div className="empty-panel compact">
           <strong>{loading ? "正在加载" : "暂无定时任务"}</strong>
-          <p>通过对话创建提醒后，会在这里显示。</p>
+          <p>在对话中说「每天晚上 9 点提醒我拉伸」，提醒会出现在这里。</p>
         </div>
       ) : (
         <div className="reminder-list">

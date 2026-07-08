@@ -25,8 +25,8 @@ export function SessionSidebar({
     <aside className={`session-sidebar ${isOpen ? "is-open" : ""}`} aria-label="历史会话">
       <div className="sidebar-header">
         <div>
-          <span className="eyebrow">Sessions</span>
-          <h2>历史会话</h2>
+          <span className="eyebrow">历史记录</span>
+          <h2>我的对话</h2>
         </div>
         <button className="icon-button ghost mobile-only" type="button" onClick={onClose} aria-label="关闭历史">
           <PanelLeftClose size={18} />
@@ -40,7 +40,7 @@ export function SessionSidebar({
 
       <div className="sidebar-search" aria-hidden="true">
         <Search size={15} />
-        <span>最近活动优先</span>
+        <span>按最近活动排序</span>
       </div>
 
       <div className="session-list">
@@ -52,8 +52,8 @@ export function SessionSidebar({
           </>
         ) : sessions.length === 0 ? (
           <div className="empty-panel">
-            <strong>暂无历史</strong>
-            <span>完成一次研究或打卡后会出现在这里。</span>
+            <strong>还没有记录</strong>
+            <span>完成打卡或研究后，对话会保存在这里。</span>
           </div>
         ) : (
           sessions.map((session) => (

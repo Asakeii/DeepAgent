@@ -111,7 +111,7 @@ function ReminderCard({ item, onToggleReminder }: { item: TranscriptItem; onTogg
 function ThinkingState() {
   return (
     <div className="thinking-state" role="status" aria-live="polite" aria-label="思考中">
-      <span className="thinking-label">思考中</span>
+      <span className="thinking-label">正在思考</span>
       <span className="thinking-dots" aria-hidden="true">
         <span />
         <span />

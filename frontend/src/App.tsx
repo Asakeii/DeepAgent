@@ -3,7 +3,7 @@ import { Composer } from "./components/Composer";
 import { MessageList } from "./components/MessageList";
 import { PlanReview } from "./components/PlanReview";
 import { RemindersPanel } from "./components/RemindersPanel";
-import { ResearchPanel } from "./components/ResearchPanel";
+import { ActivityPanel } from "./components/ActivityPanel";
 import { SessionSidebar } from "./components/SessionSidebar";
 import { TopBar } from "./components/TopBar";
 import { extractUrls } from "./lib/format";
@@ -27,6 +27,7 @@ export function App() {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia("(min-width: 900px)").matches);
+  const [view, setView] = useState<"workspace" | "reminders">("workspace");
   const [items, setItems] = useState<TranscriptItem[]>([]);
   const [input, setInput] = useState("");
   const [image, setImage] = useState<string | undefined>();
@@ -152,6 +153,10 @@ export function App() {
     assistantIdRef.current = null;
   }, []);
 
+  const switchView = useCallback((nextView: "workspace" | "reminders") => {
+    setView(nextView);
+  }, []);
+
   const handleStreamEvent = useCallback(
     (event: StreamEvent) => {
       const payload = event.data;
@@ -172,7 +177,7 @@ export function App() {
           setActiveAgent("human_feedback");
           setReviewOpen(true);
           setBusy(false);
-          updateAssistant({ content: "研究计划已准备好，请确认后继续。", state: "complete", agent: "human_feedback" });
+          updateAssistant({ content: "方案已准备好，请确认后开始研究。", state: "complete", agent: "human_feedback" });
           return;
 
         case "tool_calls":
@@ -403,7 +408,7 @@ export function App() {
     appendItem({
       id: assistantId,
       role: "assistant",
-      content: "已确认计划，继续执行研究。",
+      content: "已确认方案，开始深入研究。",
       state: "streaming",
       agent: "research_team",
     });
@@ -425,7 +430,7 @@ export function App() {
       appendItem({
         id: assistantId,
         role: "assistant",
-        content: "收到反馈，正在重新规划。",
+        content: "收到反馈，正在重新定制方案。",
         state: "streaming",
         agent: "planner",
       });
@@ -502,41 +507,60 @@ export function App() {
           sidebarOpen={sidebarOpen}
           planReviewEnabled={planReviewEnabled}
           busy={busy}
+          view={view}
           onToggleSidebar={() => setSidebarOpen((value) => !value)}
           onNew={newChat}
           onTogglePlanReview={setPlanReviewEnabled}
+          onSwitchView={switchView}
         />
 
         <div className="workspace-body">
-          <section className="conversation-column">
-            <PlanReview
-              plan={plan}
-              open={reviewOpen}
-              busy={busy}
-              onAccept={acceptPlan}
-              onEdit={editPlan}
-              onDismiss={() => setReviewOpen(false)}
-            />
-            <MessageList items={items} onPrompt={(value) => void sendPrompt(value)} onToggleReminder={handleToggleReminder} />
-            <Composer
-              value={input}
-              image={image}
-              busy={busy}
-              onChange={setInput}
-              onImageChange={setImage}
-              onSend={() => void sendPrompt()}
-            />
-          </section>
+          {view === "workspace" ? (
+            <>
+              <section className="conversation-column">
+                <PlanReview
+                  plan={plan}
+                  open={reviewOpen}
+                  busy={busy}
+                  onAccept={acceptPlan}
+                  onEdit={editPlan}
+                  onDismiss={() => setReviewOpen(false)}
+                />
+                <MessageList items={items} onPrompt={(value) => void sendPrompt(value)} onToggleReminder={handleToggleReminder} />
+                <Composer
+                  value={input}
+                  image={image}
+                  busy={busy}
+                  onChange={setInput}
+                  onImageChange={setImage}
+                  onSend={() => void sendPrompt()}
+                />
+              </section>
 
-          <aside className="research-panel" aria-label="工作台侧栏">
-            <RemindersPanel
-              reminders={reminders}
-              loading={remindersLoading}
-              onRefresh={() => void refreshReminders()}
-              onToggle={handleToggleReminderFromPanel}
-            />
-            <ResearchPanel activeAgent={activeAgent} plan={plan} tools={tools} />
-          </aside>
+              <aside className="activity-panel" aria-label="助手活动">
+                <ActivityPanel activeAgent={activeAgent} plan={plan} tools={tools} busy={busy} />
+              </aside>
+            </>
+          ) : (
+            <section className="reminders-page" aria-label="提醒管理">
+              <div className="reminders-page-header">
+                <div>
+                  <h1>我的提醒</h1>
+                  <p>管理当前会话的定时提醒，保持自律节奏。</p>
+                </div>
+                <button className="secondary-button" type="button" onClick={() => void refreshReminders()}>
+                  刷新
+                </button>
+              </div>
+              <RemindersPanel
+                reminders={reminders}
+                loading={remindersLoading}
+                onRefresh={() => void refreshReminders()}
+                onToggle={handleToggleReminderFromPanel}
+                showHeader={false}
+              />
+            </section>
+          )}
         </div>
       </div>
     </div>

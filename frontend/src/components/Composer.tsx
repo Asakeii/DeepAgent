@@ -57,7 +57,7 @@ export function Composer({ value, image, busy, onChange, onImageChange, onSend }
           onChange={(event) => onChange(event.target.value)}
           onPaste={handlePaste}
           onKeyDown={handleKeyDown}
-          placeholder="记录今天的点滴，或提出你想了解的问题..."
+          placeholder="记录运动饮食、设置提醒，或让我深入研究帮你定制方案…"
           rows={1}
           disabled={busy}
         />
@@ -65,7 +65,7 @@ export function Composer({ value, image, busy, onChange, onImageChange, onSend }
           <Send size={18} />
         </button>
       </div>
-      <div className="composer-hint">Enter 发送 · Shift+Enter 换行 · 可粘贴或上传食物图片</div>
+      <div className="composer-hint">Enter 发送 · Shift+Enter 换行 · 支持粘贴或上传食物图片识图</div>
     </footer>
   );
 }
