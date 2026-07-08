@@ -495,7 +495,7 @@ AppendMessage:
 
 然后做这些：
 
-- [ ] memory 分层。
+- [x] memory 分层。
 - [x] report artifact。
 - [x] citation 存储。
 - [ ] reminder multi-connection。

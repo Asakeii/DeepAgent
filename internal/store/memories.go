@@ -8,7 +8,21 @@ import (
 	"time"
 )
 
-const MemoryKindPreference = "preference"
+const (
+	MemoryKindPreference = "preference"
+	MemoryKindGoal       = "goal"
+	MemoryKindFact       = "fact"
+	MemoryKindEpisodic   = "episodic"
+	MemoryKindBusiness   = "business"
+)
+
+var knownMemoryKinds = map[string]bool{
+	MemoryKindPreference: true,
+	MemoryKindGoal:       true,
+	MemoryKindFact:       true,
+	MemoryKindEpisodic:   true,
+	MemoryKindBusiness:   true,
+}
 
 type MemoryRecord struct {
 	ID         int64
@@ -27,17 +41,12 @@ func CreateMemory(ctx context.Context, db *sql.DB, record MemoryRecord) (int64, 
 		return 0, fmt.Errorf("db is nil")
 	}
 	record.UserID = NormalizeUserID(record.UserID)
-	record.Kind = strings.TrimSpace(record.Kind)
+	record.Kind = NormalizeMemoryKind(record.Kind)
 	record.Content = strings.TrimSpace(record.Content)
-	if record.Kind == "" {
-		record.Kind = MemoryKindPreference
-	}
 	if record.Content == "" {
 		return 0, fmt.Errorf("memory content is required")
 	}
-	if len(record.Kind) > 32 {
-		record.Kind = record.Kind[:32]
-	}
+	record.Source = strings.TrimSpace(record.Source)
 	if len(record.Source) > 64 {
 		record.Source = record.Source[:64]
 	}
@@ -76,9 +85,18 @@ func ListMemories(ctx context.Context, db *sql.DB, userID, kind string, limit in
 	args := []any{userID}
 	if strings.TrimSpace(kind) != "" {
 		query += ` AND kind=?`
-		args = append(args, strings.TrimSpace(kind))
+		args = append(args, NormalizeMemoryKind(kind))
 	}
-	query += ` ORDER BY importance DESC, updated_at DESC LIMIT ?`
+	query += ` ORDER BY
+		CASE kind
+			WHEN 'preference' THEN 1
+			WHEN 'goal' THEN 2
+			WHEN 'fact' THEN 3
+			WHEN 'business' THEN 4
+			WHEN 'episodic' THEN 5
+			ELSE 9
+		END,
+		importance DESC, updated_at DESC LIMIT ?`
 	args = append(args, limit)
 
 	rows, err := db.QueryContext(ctx, query, args...)
@@ -96,4 +114,29 @@ func ListMemories(ctx context.Context, db *sql.DB, userID, kind string, limit in
 		out = append(out, record)
 	}
 	return out, rows.Err()
+}
+
+func NormalizeMemoryKind(kind string) string {
+	kind = strings.ToLower(strings.TrimSpace(kind))
+	switch kind {
+	case "", "pref", "preference", "偏好":
+		return MemoryKindPreference
+	case "goal", "target", "目标":
+		return MemoryKindGoal
+	case "fact", "profile", "事实":
+		return MemoryKindFact
+	case "episodic", "event", "history", "经历", "事件":
+		return MemoryKindEpisodic
+	case "business", "domain", "record", "业务":
+		return MemoryKindBusiness
+	default:
+		if len(kind) > 32 {
+			return kind[:32]
+		}
+		return kind
+	}
+}
+
+func IsKnownMemoryKind(kind string) bool {
+	return knownMemoryKinds[NormalizeMemoryKind(kind)]
 }
