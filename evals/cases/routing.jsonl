@@ -1,0 +1,8 @@
+{"id":"chat_001","category":"chat","input":"你好，今天状态怎么样？","expected_route":"direct","forbidden_tools":["hand_to_planner","hand_to_checkin","web_search","record_checkin"]}
+{"id":"research_001","category":"research","input":"调研一下 2026 年主流 Agent 框架的状态管理方案，并给我对比结论","expected_route":"research","expected_tools":["hand_to_planner"],"forbidden_tools":["record_checkin"]}
+{"id":"research_002","category":"research","input":"帮我分析 Deep Research 产品怎么做引用质量评估","expected_route":"research","expected_tools":["hand_to_planner"],"forbidden_tools":["record_checkin"]}
+{"id":"checkin_001","category":"checkin","input":"我今天跑步 5 公里，帮我记录一下","expected_route":"checkin","expected_tools":["hand_to_checkin","record_checkin"],"forbidden_tools":["web_search"]}
+{"id":"checkin_002","category":"checkin","input":"查一下我最近 7 天的运动打卡","expected_route":"checkin","expected_tools":["hand_to_checkin","query_checkin"],"forbidden_tools":["web_search"]}
+{"id":"reminder_001","category":"reminder","input":"明天上午 9 点提醒我提交周报","expected_route":"checkin","expected_tools":["hand_to_checkin","schedule_reminder"],"forbidden_tools":["web_search"]}
+{"id":"reminder_002","category":"reminder","input":"把刚才那个喝水提醒取消掉","expected_route":"checkin","expected_tools":["hand_to_checkin","cancel_reminder"],"forbidden_tools":["web_search"]}
+{"id":"tool_failure_001","category":"tool_failure","input":"查询我的打卡总结，如果数据库暂时不可用请告诉我怎么继续","expected_route":"checkin","expected_tools":["hand_to_checkin","get_summary"],"final_contains":["失败","稍后"]}
