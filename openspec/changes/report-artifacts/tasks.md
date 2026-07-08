@@ -1,0 +1,6 @@
+- [x] 新增 artifact 持久化表和迁移。
+- [x] 新增 artifact store API。
+- [x] 研究 run 完成后自动保存 markdown report artifact。
+- [x] 新增 `/api/artifacts` 查询接口。
+- [x] 补充 store 和 ChatService 测试。
+- [ ] 后续：增加 citation 表和报告导出能力。

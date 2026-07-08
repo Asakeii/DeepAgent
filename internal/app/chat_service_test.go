@@ -32,6 +32,7 @@ func TestChatServiceRoutesToFakeCheckinRunner(t *testing.T) {
 	threadID := "fake-thread-" + suffix
 	userID := "fake-user-" + suffix
 	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifacts WHERE thread_id=?", threadID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM run_events WHERE run_id=?", runID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM runs WHERE id=?", runID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM messages WHERE thread_id=?", threadID)
@@ -87,6 +88,7 @@ func TestChatServiceRunTimeoutWithFakeResearchRunner(t *testing.T) {
 	threadID := "timeout-thread-" + suffix
 	userID := "timeout-user-" + suffix
 	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifacts WHERE thread_id=?", threadID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM run_events WHERE run_id=?", runID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM runs WHERE id=?", runID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM messages WHERE thread_id=?", threadID)
@@ -142,6 +144,7 @@ func TestChatServiceRejectsInvalidImageBeforeRunner(t *testing.T) {
 	threadID := "bad-image-thread-" + suffix
 	userID := "bad-image-user-" + suffix
 	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifacts WHERE thread_id=?", threadID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM run_events WHERE run_id=?", runID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM runs WHERE id=?", runID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM messages WHERE thread_id=?", threadID)
@@ -175,6 +178,53 @@ func TestChatServiceRejectsInvalidImageBeforeRunner(t *testing.T) {
 	}
 	if run.Status != store.RunStatusFailed {
 		t.Fatalf("run status=%s, want %s", run.Status, store.RunStatusFailed)
+	}
+}
+
+func TestChatServicePersistsResearchArtifact(t *testing.T) {
+	db := appDBForTest(t)
+	if db == nil {
+		t.Skip("TEST_MYSQL_DSN not set")
+	}
+	prevDB := infra.DB
+	infra.DB = db
+	t.Cleanup(func() {
+		infra.DB = prevDB
+	})
+
+	suffix := time.Now().Format("20060102150405.000000000")
+	runID := "artifact-run-" + suffix
+	threadID := "artifact-thread-" + suffix
+	userID := "artifact-user-" + suffix
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifacts WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM run_events WHERE run_id=?", runID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM runs WHERE id=?", runID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM messages WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM memories WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM threads WHERE id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM users WHERE id=?", userID)
+	})
+
+	service := NewChatServiceWithDeps(&fakeResearchRunner{result: ResearchRunResult{Final: "# 最终报告"}}, &fakeCheckinRunner{}, fakeReminderStreamer{})
+	service.RunStream(context.Background(), model.ChatRequest{
+		RunID:    runID,
+		ThreadID: threadID,
+		UserID:   userID,
+		Messages: []*schema.Message{
+			schema.UserMessage("研究成熟 Agent 项目"),
+		},
+	}, NewCaptureWriter())
+
+	records, err := store.ListArtifacts(context.Background(), db, userID, threadID, store.ArtifactKindReport, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("len=%d, want 1", len(records))
+	}
+	if records[0].RunID != runID || records[0].Content != "# 最终报告" {
+		t.Fatalf("unexpected artifact: %+v", records[0])
 	}
 }
 

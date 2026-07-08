@@ -33,6 +33,7 @@ func DBForTest(t *testing.T) *sql.DB {
 	_ = EnsureIdentityTables(context.Background(), db)
 	_ = EnsureMessageTables(context.Background(), db)
 	_ = EnsureToolAuditTables(context.Background(), db)
+	_ = EnsureArtifactTables(context.Background(), db)
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS runs (
         id VARCHAR(128) NOT NULL PRIMARY KEY,
         user_id VARCHAR(128) NOT NULL DEFAULT '',

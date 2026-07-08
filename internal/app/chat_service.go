@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"time"
@@ -173,6 +174,9 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 		return
 	}
 	persistResearchMessages(ctx, req.ThreadID, originalMessages, result.Final)
+	if err := persistResearchArtifact(ctx, req, result.Final); err != nil {
+		runLog.ErrorContext(ctx, "persist research artifact failed", slog.Any("error", err))
+	}
 }
 
 func (s *ChatService) RunToText(ctx context.Context, req model.ChatRequest) string {
@@ -204,4 +208,27 @@ func writeRunTimedOut(writer EventWriter, runID, threadID string) {
 		Content:      "运行超时，请缩小任务范围或稍后重试",
 		FinishReason: "timeout",
 	})
+}
+
+func persistResearchArtifact(ctx context.Context, req model.ChatRequest, final string) error {
+	if final == "" {
+		return nil
+	}
+	metadata, _ := json.Marshal(map[string]any{
+		"run_id":    req.RunID,
+		"thread_id": req.ThreadID,
+		"mode":      "research",
+	})
+	_, err := store.CreateArtifact(ctx, infra.DB, store.ArtifactRecord{
+		UserID:   req.UserID,
+		ThreadID: req.ThreadID,
+		RunID:    req.RunID,
+		Kind:     store.ArtifactKindReport,
+		Title:    firstUserMessage(req),
+		Format:   store.ArtifactFormatMD,
+		Content:  final,
+		Metadata: metadata,
+		Source:   store.ArtifactSourceAgent,
+	})
+	return err
 }

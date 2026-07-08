@@ -153,6 +153,25 @@ type ListMemoriesResponse struct {
 	Memories []*MemoryResp `json:"memories"`
 }
 
+type ArtifactResp struct {
+	ID        int64  `json:"id"`
+	UserID    string `json:"user_id,omitempty"`
+	ThreadID  string `json:"thread_id,omitempty"`
+	RunID     string `json:"run_id,omitempty"`
+	Kind      string `json:"kind"`
+	Title     string `json:"title"`
+	Format    string `json:"format"`
+	Content   string `json:"content"`
+	Version   int64  `json:"version"`
+	Source    string `json:"source,omitempty"`
+	CreatedAt string `json:"created_at,omitempty"`
+	UpdatedAt string `json:"updated_at,omitempty"`
+}
+
+type ListArtifactsResponse struct {
+	Artifacts []*ArtifactResp `json:"artifacts"`
+}
+
 // ChatResp 是 SSE 事件里返回给前端的统一消息结构。
 type ChatResp struct {
 	RunID          string           `json:"run_id,omitempty"`
