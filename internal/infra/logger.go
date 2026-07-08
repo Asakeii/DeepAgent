@@ -24,6 +24,10 @@ type SSEWriter struct {
 	mu sync.Mutex
 }
 
+type EventWriter interface {
+	WriteEvent(event string, payload any) error
+}
+
 func NewSSEWriter(w http.ResponseWriter) *SSEWriter {
 	return &SSEWriter{w: w}
 }
@@ -68,14 +72,21 @@ type LoggerCallback struct {
 
 	ID  string
 	SSE *SSEWriter
-	Out chan string
+	// Events allows non-HTTP application services to receive the same event
+	// stream without depending on the concrete SSE writer type.
+	Events EventWriter
+	Out    chan string
 	// Final receives completed assistant messages for persistence.
 	// It is intentionally best-effort so callback goroutines never block the graph.
 	Final chan string
 }
 
 func (cb *LoggerCallback) push(ctx context.Context, event string, data *model.ChatResp) error {
-	if cb.SSE != nil {
+	if cb.Events != nil {
+		if err := cb.Events.WriteEvent(event, data); err != nil {
+			return err
+		}
+	} else if cb.SSE != nil {
 		if err := cb.SSE.WriteEvent(event, data); err != nil {
 			return err
 		}
