@@ -57,29 +57,40 @@ func WechatCallback(w http.ResponseWriter, r *http.Request) {
 // handleWechatVerify responds to WeChat's server verification GET request.
 // WeChat sends: ?signature=xxx&timestamp=xxx&nonce=xxx&echostr=xxx
 func handleWechatVerify(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	echostr := q.Get("echostr")
+
+	if echostr == "" {
+		http.Error(w, "missing echostr", http.StatusBadRequest)
+		return
+	}
+	if !verifyWechatSignature(w, r) {
+		return
+	}
+
+	w.Write([]byte(echostr))
+}
+
+func verifyWechatSignature(w http.ResponseWriter, r *http.Request) bool {
 	token := os.Getenv("WECHAT_TOKEN")
 	if token == "" {
 		http.Error(w, "WECHAT_TOKEN not configured", http.StatusInternalServerError)
-		return
+		return false
 	}
 
 	q := r.URL.Query()
 	signature := q.Get("signature")
 	timestamp := q.Get("timestamp")
 	nonce := q.Get("nonce")
-	echostr := q.Get("echostr")
-
-	if signature == "" || timestamp == "" || nonce == "" || echostr == "" {
+	if signature == "" || timestamp == "" || nonce == "" {
 		http.Error(w, "missing params", http.StatusBadRequest)
-		return
+		return false
 	}
-
 	if checkWechatSignature(token, timestamp, nonce) != signature {
 		http.Error(w, "signature mismatch", http.StatusForbidden)
-		return
+		return false
 	}
-
-	w.Write([]byte(echostr))
+	return true
 }
 
 // checkWechatSignature computes SHA1(sort(token, timestamp, nonce)) per WeChat spec.
@@ -93,6 +104,10 @@ func checkWechatSignature(token, timestamp, nonce string) string {
 
 // handleWechatMessage processes incoming WeChat message POST requests.
 func handleWechatMessage(w http.ResponseWriter, r *http.Request) {
+	if !verifyWechatSignature(w, r) {
+		return
+	}
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "read body", http.StatusBadRequest)
