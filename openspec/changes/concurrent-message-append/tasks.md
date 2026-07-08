@@ -5,4 +5,4 @@
 - [x] 将 `messages.turn_idx` 调整为 `BIGINT`。
 - [x] 增加启动时 messages 表幂等创建/修正。
 - [x] 增加同 thread 并发 append 测试，验证 turn_idx 不重复。
-- [ ] 后续：引入正式 DB migration 工具和 schema 版本表。
+- [x] 正式 DB migration 基座和 schema 版本表已由 `db-migrations` 补齐。

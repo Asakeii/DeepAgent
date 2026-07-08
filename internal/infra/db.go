@@ -32,16 +32,7 @@ func InitDB(ctx context.Context) error {
 	if err := db.PingContext(ctx); err != nil {
 		return fmt.Errorf("ping mysql: %w", err)
 	}
-	if err := store.EnsureIdentityTables(ctx, db); err != nil {
-		return err
-	}
-	if err := store.EnsureMessageTables(ctx, db); err != nil {
-		return err
-	}
-	if err := store.EnsureRunTables(ctx, db); err != nil {
-		return err
-	}
-	if err := store.EnsureToolAuditTables(ctx, db); err != nil {
+	if err := store.RunMigrations(ctx, db); err != nil {
 		return err
 	}
 	DB = db
