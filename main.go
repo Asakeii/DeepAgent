@@ -193,22 +193,43 @@ func runServer() {
 
 	addr := ":8741"
 	log.Printf("deepAgent server listening on %s", addr)
-	if err := http.ListenAndServe(addr, withCORS(mux)); err != nil {
+	if err := http.ListenAndServe(addr, withHTTPGuards(mux)); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func withCORS(next http.Handler) http.Handler {
+func withHTTPGuards(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-DeepAgent-User, X-DeepAgent-Run")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		if !applyCORS(w, r) {
+			http.Error(w, "origin forbidden", http.StatusForbidden)
+			return
+		}
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
+		if limit := conf.App.Server.MaxBodyBytes; limit > 0 && r.Body != nil {
+			r.Body = http.MaxBytesReader(w, r.Body, limit)
+		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func applyCORS(w http.ResponseWriter, r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	for _, allowed := range conf.App.Server.AllowedOrigins {
+		if origin == allowed {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-DeepAgent-User, X-DeepAgent-Run")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			return true
+		}
+	}
+	return false
 }
 
 func frontendDir() string {

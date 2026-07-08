@@ -16,6 +16,7 @@ type Config struct {
 	Model    ModelConfig    `yaml:"model"`
 	Setting  SettingConfig  `yaml:"setting"`
 	Database DatabaseConfig `yaml:"database"`
+	Server   ServerConfig   `yaml:"server"`
 }
 
 // DatabaseConfig 描述 MySQL 连接配置。
@@ -55,6 +56,11 @@ type SettingConfig struct {
 	EnableBackgroundInvestigation bool `yaml:"enable_background_investigation"`
 }
 
+type ServerConfig struct {
+	AllowedOrigins []string `yaml:"allowed_origins"`
+	MaxBodyBytes   int64    `yaml:"max_body_bytes"`
+}
+
 var App *Config // 全局配置变量，保存加载后的配置
 
 // Load 负责加载并解析 conf/deep-agent.yaml 配置文件
@@ -87,6 +93,12 @@ func Load(ctx context.Context) (*Config, error) {
 	// 如果没有配置最大计划迭代次数，则设置默认值为1
 	if cfg.Setting.MaxPlanIterations <= 0 {
 		cfg.Setting.MaxPlanIterations = 1
+	}
+	if cfg.Server.MaxBodyBytes <= 0 {
+		cfg.Server.MaxBodyBytes = 1 << 20
+	}
+	if len(cfg.Server.AllowedOrigins) == 0 {
+		cfg.Server.AllowedOrigins = []string{"http://localhost:5173", "http://127.0.0.1:5173"}
 	}
 
 	App = &cfg // 保存到全局变量
