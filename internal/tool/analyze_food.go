@@ -14,6 +14,8 @@ import (
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
+
+	"deepAgent/internal/security"
 )
 
 const maxImageBytes = 20 << 20 // 20MB image size limit
@@ -159,6 +161,9 @@ func readImageFromDataURL(dataURL string) ([]byte, string, error) {
 }
 
 func readImageFromURL(url string) ([]byte, string, error) {
+	if err := security.ValidateExternalURL(url, security.URLPolicyFromConfig()); err != nil {
+		return nil, "", err
+	}
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 	if err != nil {
 		return nil, "", err

@@ -27,6 +27,9 @@ server:
   max_body_bytes: 2048
   image_max_bytes: 4096
   image_allowed_types: ["image/png"]
+  url_allowed_hosts: ["example.com", "*.trusted.example"]
+  url_denied_hosts: ["blocked.example"]
+  url_allow_private_networks: true
   api_keys: ["test-key"]
   rate_limit_per_minute: 60
   sse_heartbeat_seconds: 10
@@ -59,6 +62,9 @@ server:
 	}
 	if cfg.Server.ImageMaxBytes != 4096 || len(cfg.Server.ImageAllowedTypes) != 1 || cfg.Server.ImageAllowedTypes[0] != "image/png" {
 		t.Fatalf("server image config not parsed: %+v", cfg.Server)
+	}
+	if len(cfg.Server.URLAllowedHosts) != 2 || cfg.Server.URLAllowedHosts[0] != "example.com" || len(cfg.Server.URLDeniedHosts) != 1 || !cfg.Server.URLAllowPrivateNetworks {
+		t.Fatalf("server URL policy config not parsed: %+v", cfg.Server)
 	}
 	if len(cfg.Server.APIKeys) != 1 || cfg.Server.APIKeys[0] != "test-key" || cfg.Server.RateLimitPerMinute != 60 || cfg.Server.SSEHeartbeatSeconds != 10 {
 		t.Fatalf("server security config not parsed: %+v", cfg.Server)

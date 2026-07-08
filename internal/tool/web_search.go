@@ -13,6 +13,8 @@ import (
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
+
+	"deepAgent/internal/security"
 )
 
 // searxngBaseURL is the SearXNG instance endpoint (Docker service name).
@@ -40,13 +42,13 @@ type searxngResponse struct {
 }
 
 type searxngResult struct {
-	Title       string   `json:"title"`
-	URL         string   `json:"url"`
-	Content     string   `json:"content"`
-	Engine      string   `json:"engine"`
-	Score       float64  `json:"score"`
-	Published   string   `json:"publishedDate"`
-	Engines     []string `json:"engines"`
+	Title     string   `json:"title"`
+	URL       string   `json:"url"`
+	Content   string   `json:"content"`
+	Engine    string   `json:"engine"`
+	Score     float64  `json:"score"`
+	Published string   `json:"publishedDate"`
+	Engines   []string `json:"engines"`
 }
 
 // ---------------------------------------------------------------------------
@@ -148,6 +150,9 @@ type webFetchOutput struct {
 func fetchPage(ctx context.Context, in webFetchInput) (webFetchOutput, error) {
 	if in.URL == "" {
 		return webFetchOutput{}, fmt.Errorf("url is required")
+	}
+	if err := security.ValidateExternalURL(in.URL, security.URLPolicyFromConfig()); err != nil {
+		return webFetchOutput{}, err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, in.URL, nil)

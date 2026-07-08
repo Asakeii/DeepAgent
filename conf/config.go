@@ -62,13 +62,16 @@ type SettingConfig struct {
 }
 
 type ServerConfig struct {
-	AllowedOrigins      []string `yaml:"allowed_origins"`
-	MaxBodyBytes        int64    `yaml:"max_body_bytes"`
-	ImageMaxBytes       int64    `yaml:"image_max_bytes"`
-	ImageAllowedTypes   []string `yaml:"image_allowed_types"`
-	APIKeys             []string `yaml:"api_keys"`
-	RateLimitPerMinute  int      `yaml:"rate_limit_per_minute"`
-	SSEHeartbeatSeconds int      `yaml:"sse_heartbeat_seconds"`
+	AllowedOrigins          []string `yaml:"allowed_origins"`
+	MaxBodyBytes            int64    `yaml:"max_body_bytes"`
+	ImageMaxBytes           int64    `yaml:"image_max_bytes"`
+	ImageAllowedTypes       []string `yaml:"image_allowed_types"`
+	URLAllowedHosts         []string `yaml:"url_allowed_hosts"`
+	URLDeniedHosts          []string `yaml:"url_denied_hosts"`
+	URLAllowPrivateNetworks bool     `yaml:"url_allow_private_networks"`
+	APIKeys                 []string `yaml:"api_keys"`
+	RateLimitPerMinute      int      `yaml:"rate_limit_per_minute"`
+	SSEHeartbeatSeconds     int      `yaml:"sse_heartbeat_seconds"`
 }
 
 var App *Config // 全局配置变量，保存加载后的配置

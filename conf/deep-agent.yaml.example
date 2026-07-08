@@ -47,6 +47,11 @@ server:
   max_body_bytes: 1048576
   image_max_bytes: 5242880
   image_allowed_types: ["image/jpeg", "image/png", "image/webp", "image/gif"]
+  # Empty url_allowed_hosts allows public HTTP(S) hosts except denied/private targets.
+  # Patterns support exact host and wildcard suffix such as "*.example.com".
+  url_allowed_hosts: []
+  url_denied_hosts: []
+  url_allow_private_networks: false
   # Empty api_keys disables API-key auth for local development.
   # Configure one or more keys in production and pass Authorization: Bearer <key>.
   api_keys: []

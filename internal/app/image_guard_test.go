@@ -4,6 +4,8 @@ import (
 	"encoding/base64"
 	"strings"
 	"testing"
+
+	"deepAgent/conf"
 )
 
 const tinyPNGDataURL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lD1V9wAAAABJRU5ErkJggg=="
@@ -51,11 +53,27 @@ func TestValidateImageInputRejectsLocalPath(t *testing.T) {
 }
 
 func TestValidateImageInputAllowsHTTPURL(t *testing.T) {
+	prev := conf.App
+	conf.App = &conf.Config{}
+	t.Cleanup(func() { conf.App = prev })
 	err := validateImageInputWithPolicy("https://example.com/a.png", imageInputPolicy{
 		MaxBytes:     1024,
 		AllowedTypes: []string{"image/png"},
 	})
 	if err != nil {
 		t.Fatalf("validate image URL: %v", err)
+	}
+}
+
+func TestValidateImageInputRejectsPrivateHTTPURL(t *testing.T) {
+	prev := conf.App
+	conf.App = &conf.Config{}
+	t.Cleanup(func() { conf.App = prev })
+	err := validateImageInputWithPolicy("http://127.0.0.1/a.png", imageInputPolicy{
+		MaxBytes:     1024,
+		AllowedTypes: []string{"image/png"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "private or local") {
+		t.Fatalf("err=%v, want private URL rejection", err)
 	}
 }

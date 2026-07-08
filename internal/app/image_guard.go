@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"deepAgent/conf"
+	"deepAgent/internal/security"
 )
 
 type imageInputPolicy struct {
@@ -61,7 +62,7 @@ func validateImageInputWithPolicy(raw string, policy imageInputPolicy) error {
 	}
 
 	if isHTTPURL(raw) {
-		return nil
+		return security.ValidateExternalURL(raw, security.URLPolicyFromConfig())
 	}
 
 	data, err := decodeBoundedBase64(raw, policy.MaxBytes)
