@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"deepAgent/conf"
 	"deepAgent/internal/app"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
@@ -17,6 +18,10 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	sse := infra.NewSSEWriter(w)
+	if conf.App != nil {
+		stopHeartbeat := sse.StartHeartbeat(ctx, conf.App.Server.SSEHeartbeatInterval())
+		defer stopHeartbeat()
+	}
 
 	var req model.ChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

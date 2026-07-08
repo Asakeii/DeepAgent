@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/cloudwego/eino/callbacks"
 	ecmodel "github.com/cloudwego/eino/components/model"
@@ -53,7 +54,46 @@ func (sw *SSEWriter) WriteEvent(event string, payload any) error {
 	if _, err = sw.w.Write([]byte("\n\n")); err != nil {
 		return err
 	}
-	if f, ok := sw.w.(http.Flusher); ok {
+	flushResponse(sw.w)
+
+	return nil
+}
+
+func (sw *SSEWriter) WriteComment(comment string) error {
+	sw.mu.Lock()
+	defer sw.mu.Unlock()
+
+	if _, err := sw.w.Write([]byte(": " + comment + "\n\n")); err != nil {
+		return err
+	}
+	flushResponse(sw.w)
+	return nil
+}
+
+func (sw *SSEWriter) StartHeartbeat(ctx context.Context, interval time.Duration) func() {
+	if interval <= 0 {
+		return func() {}
+	}
+	heartbeatCtx, cancel := context.WithCancel(ctx)
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-heartbeatCtx.Done():
+				return
+			case <-ticker.C:
+				if err := sw.WriteComment("heartbeat"); err != nil {
+					return
+				}
+			}
+		}
+	}()
+	return cancel
+}
+
+func flushResponse(w http.ResponseWriter) {
+	if f, ok := w.(http.Flusher); ok {
 		// Flush 在客户端断开连接后可能 panic（bufio.Writer 变 nil）。
 		// recover 兜底，让 callback goroutine 不崩。
 		func() {
@@ -61,8 +101,6 @@ func (sw *SSEWriter) WriteEvent(event string, payload any) error {
 			f.Flush()
 		}()
 	}
-
-	return nil
 }
 
 // LoggerCallback 把 Eino 运行过程中的模型输出、工具调用和工具结果转成 SSE 事件。

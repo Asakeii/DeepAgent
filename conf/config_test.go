@@ -26,6 +26,7 @@ server:
   max_body_bytes: 2048
   api_keys: ["test-key"]
   rate_limit_per_minute: 60
+  sse_heartbeat_seconds: 10
 `)
 	if err := os.MkdirAll(filepath.Join(dir, "conf"), 0755); err != nil {
 		t.Fatal(err)
@@ -50,7 +51,7 @@ server:
 	if cfg.Server.MaxBodyBytes != 2048 || len(cfg.Server.AllowedOrigins) != 1 || cfg.Server.AllowedOrigins[0] != "https://app.example.com" {
 		t.Fatalf("server config not parsed: %+v", cfg.Server)
 	}
-	if len(cfg.Server.APIKeys) != 1 || cfg.Server.APIKeys[0] != "test-key" || cfg.Server.RateLimitPerMinute != 60 {
+	if len(cfg.Server.APIKeys) != 1 || cfg.Server.APIKeys[0] != "test-key" || cfg.Server.RateLimitPerMinute != 60 || cfg.Server.SSEHeartbeatSeconds != 10 {
 		t.Fatalf("server security config not parsed: %+v", cfg.Server)
 	}
 }
@@ -81,5 +82,15 @@ setting:
 	}
 	if cfg.Server.MaxBodyBytes <= 0 || len(cfg.Server.AllowedOrigins) == 0 {
 		t.Fatalf("server defaults missing: %+v", cfg.Server)
+	}
+	if cfg.Server.SSEHeartbeatSeconds != DefaultSSEHeartbeatSeconds {
+		t.Fatalf("sse heartbeat default missing: %+v", cfg.Server)
+	}
+}
+
+func TestServerConfigSSEHeartbeatIntervalDisabled(t *testing.T) {
+	cfg := ServerConfig{SSEHeartbeatSeconds: -1}
+	if got := cfg.SSEHeartbeatInterval(); got != 0 {
+		t.Fatalf("heartbeat interval=%s, want disabled", got)
 	}
 }

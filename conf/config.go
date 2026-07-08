@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
+
+const DefaultSSEHeartbeatSeconds = 15
 
 // Config 对应 conf/deep-agent.yaml 的整体结构。
 // 配置分为 MCP 服务、模型服务和运行参数三部分。
@@ -57,10 +60,11 @@ type SettingConfig struct {
 }
 
 type ServerConfig struct {
-	AllowedOrigins     []string `yaml:"allowed_origins"`
-	MaxBodyBytes       int64    `yaml:"max_body_bytes"`
-	APIKeys            []string `yaml:"api_keys"`
-	RateLimitPerMinute int      `yaml:"rate_limit_per_minute"`
+	AllowedOrigins      []string `yaml:"allowed_origins"`
+	MaxBodyBytes        int64    `yaml:"max_body_bytes"`
+	APIKeys             []string `yaml:"api_keys"`
+	RateLimitPerMinute  int      `yaml:"rate_limit_per_minute"`
+	SSEHeartbeatSeconds int      `yaml:"sse_heartbeat_seconds"`
 }
 
 var App *Config // 全局配置变量，保存加载后的配置
@@ -102,7 +106,17 @@ func Load(ctx context.Context) (*Config, error) {
 	if len(cfg.Server.AllowedOrigins) == 0 {
 		cfg.Server.AllowedOrigins = []string{"http://localhost:5173", "http://127.0.0.1:5173"}
 	}
+	if cfg.Server.SSEHeartbeatSeconds == 0 {
+		cfg.Server.SSEHeartbeatSeconds = DefaultSSEHeartbeatSeconds
+	}
 
 	App = &cfg // 保存到全局变量
 	return App, nil
+}
+
+func (c ServerConfig) SSEHeartbeatInterval() time.Duration {
+	if c.SSEHeartbeatSeconds < 0 {
+		return 0
+	}
+	return time.Duration(c.SSEHeartbeatSeconds) * time.Second
 }
