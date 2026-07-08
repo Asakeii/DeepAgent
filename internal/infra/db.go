@@ -38,6 +38,9 @@ func InitDB(ctx context.Context) error {
 	if err := store.EnsureRunTables(ctx, db); err != nil {
 		return err
 	}
+	if err := store.EnsureToolAuditTables(ctx, db); err != nil {
+		return err
+	}
 	DB = db
 	return nil
 }

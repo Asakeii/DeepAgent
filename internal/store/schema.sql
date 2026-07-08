@@ -59,6 +59,25 @@ CREATE TABLE IF NOT EXISTS run_events (
     KEY idx_thread_created (thread_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS tool_audit_logs (
+    id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+    run_id        VARCHAR(128) NOT NULL DEFAULT '',
+    thread_id     VARCHAR(128) NOT NULL DEFAULT '',
+    user_id       VARCHAR(128) NOT NULL DEFAULT '',
+    tool_name     VARCHAR(128) NOT NULL,
+    risk          VARCHAR(32) NOT NULL,
+    status        VARCHAR(32) NOT NULL,
+    arguments     JSON,
+    result        MEDIUMTEXT,
+    error         TEXT,
+    duration_ms   BIGINT NOT NULL DEFAULT 0,
+    created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    completed_at  TIMESTAMP NULL,
+    KEY idx_run_tool (run_id, id),
+    KEY idx_thread_created (thread_id, created_at),
+    KEY idx_tool_status (tool_name, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS checkins (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
     thread_id   VARCHAR(128) NOT NULL,

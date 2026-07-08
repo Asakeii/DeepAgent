@@ -31,6 +31,7 @@ func DBForTest(t *testing.T) *sql.DB {
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`)
 	_ = EnsureIdentityTables(context.Background(), db)
+	_ = EnsureToolAuditTables(context.Background(), db)
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS runs (
         id VARCHAR(128) NOT NULL PRIMARY KEY,
         user_id VARCHAR(128) NOT NULL DEFAULT '',
