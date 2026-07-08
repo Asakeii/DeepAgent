@@ -36,6 +36,8 @@ setting:
   max_plan_iterations: 1
   max_step_num: 3
   enable_background_investigation: false
+  # 0 disables whole-run timeout. Configure a positive value in production.
+  run_timeout_seconds: 600
 
 database:
   dsn: "root:deepagent@tcp(mysql:3306)/deepagent?parseTime=true"

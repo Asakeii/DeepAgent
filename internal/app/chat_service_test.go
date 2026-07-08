@@ -9,6 +9,7 @@ import (
 
 	"github.com/cloudwego/eino/schema"
 
+	"deepAgent/conf"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
 	"deepAgent/internal/store"
@@ -66,6 +67,56 @@ func TestChatServiceRoutesToFakeCheckinRunner(t *testing.T) {
 	}
 }
 
+func TestChatServiceRunTimeoutWithFakeResearchRunner(t *testing.T) {
+	db := appDBForTest(t)
+	if db == nil {
+		t.Skip("TEST_MYSQL_DSN not set")
+	}
+	prevDB := infra.DB
+	prevConf := conf.App
+	infra.DB = db
+	conf.App = &conf.Config{Setting: conf.SettingConfig{RunTimeoutSeconds: 1}}
+	t.Cleanup(func() {
+		infra.DB = prevDB
+		conf.App = prevConf
+	})
+
+	suffix := time.Now().Format("20060102150405.000000000")
+	runID := "timeout-run-" + suffix
+	threadID := "timeout-thread-" + suffix
+	userID := "timeout-user-" + suffix
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM run_events WHERE run_id=?", runID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM runs WHERE id=?", runID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM messages WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM memories WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM threads WHERE id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM users WHERE id=?", userID)
+	})
+
+	service := NewChatServiceWithDeps(blockingResearchRunner{}, &fakeCheckinRunner{}, fakeReminderStreamer{})
+	writer := NewCaptureWriter()
+	service.RunStream(context.Background(), model.ChatRequest{
+		RunID:    runID,
+		ThreadID: threadID,
+		UserID:   userID,
+		Messages: []*schema.Message{
+			schema.UserMessage("执行一个会超时的研究任务"),
+		},
+	}, writer)
+
+	if got := writer.FinalContent(); got != "运行超时，请缩小任务范围或稍后重试" {
+		t.Fatalf("final content=%q, want timeout message", got)
+	}
+	run, err := store.GetRun(context.Background(), db, runID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Status != store.RunStatusFailed {
+		t.Fatalf("run status=%s, want %s", run.Status, store.RunStatusFailed)
+	}
+}
+
 func appDBForTest(t *testing.T) *sql.DB {
 	t.Helper()
 	dsn := os.Getenv("TEST_MYSQL_DSN")
@@ -95,6 +146,13 @@ type fakeResearchRunner struct {
 func (r *fakeResearchRunner) Run(ctx context.Context, req model.ChatRequest, writer EventWriter) (ResearchRunResult, error) {
 	r.called = true
 	return r.result, r.err
+}
+
+type blockingResearchRunner struct{}
+
+func (blockingResearchRunner) Run(ctx context.Context, req model.ChatRequest, writer EventWriter) (ResearchRunResult, error) {
+	<-ctx.Done()
+	return ResearchRunResult{}, ctx.Err()
 }
 
 type fakeCheckinRunner struct {

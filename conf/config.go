@@ -57,6 +57,7 @@ type SettingConfig struct {
 	MaxPlanIterations             int  `yaml:"max_plan_iterations"`
 	MaxStepNum                    int  `yaml:"max_step_num"`
 	EnableBackgroundInvestigation bool `yaml:"enable_background_investigation"`
+	RunTimeoutSeconds             int  `yaml:"run_timeout_seconds"`
 }
 
 type ServerConfig struct {
@@ -119,4 +120,11 @@ func (c ServerConfig) SSEHeartbeatInterval() time.Duration {
 		return 0
 	}
 	return time.Duration(c.SSEHeartbeatSeconds) * time.Second
+}
+
+func (c SettingConfig) RunTimeout() time.Duration {
+	if c.RunTimeoutSeconds <= 0 {
+		return 0
+	}
+	return time.Duration(c.RunTimeoutSeconds) * time.Second
 }

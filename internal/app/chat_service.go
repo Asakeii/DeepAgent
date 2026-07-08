@@ -2,11 +2,13 @@ package app
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
 	"github.com/cloudwego/eino/schema"
 
+	"deepAgent/conf"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
 	"deepAgent/internal/observability"
@@ -85,6 +87,8 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 	}
 	runCtx, stopCancellationWatcher := withRunCancellation(ctx, req.RunID)
 	defer stopCancellationWatcher()
+	runCtx, stopRunTimeout := withRunTimeout(runCtx)
+	defer stopRunTimeout()
 	runWriter := NewRunEventWriter(infra.DB, req.RunID, req.ThreadID, req.UserID, writer)
 	toolCtx := toolruntime.WithAuditContext(runCtx, toolruntime.AuditContext{
 		RunID:    req.RunID,
@@ -120,6 +124,10 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 				writeRunCancelled(runWriter, req.RunID, req.ThreadID)
 				return
 			}
+			if isRunTimedOut(toolCtx, err) {
+				writeRunTimedOut(runWriter, req.RunID, req.ThreadID)
+				return
+			}
 			_ = runWriter.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "分析失败: " + err.Error()})
 			return
 		}
@@ -131,6 +139,8 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 	if err != nil {
 		if isRunCancelled(req.RunID) {
 			writeRunCancelled(runWriter, req.RunID, req.ThreadID)
+		} else if isRunTimedOut(toolCtx, err) {
+			writeRunTimedOut(runWriter, req.RunID, req.ThreadID)
 		}
 		return
 	}
@@ -144,6 +154,8 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 		if err != nil {
 			if isRunCancelled(req.RunID) {
 				writeRunCancelled(runWriter, req.RunID, req.ThreadID)
+			} else if isRunTimedOut(toolCtx, err) {
+				writeRunTimedOut(runWriter, req.RunID, req.ThreadID)
 			}
 			return
 		}
@@ -157,4 +169,29 @@ func (s *ChatService) RunToText(ctx context.Context, req model.ChatRequest) stri
 	writer := NewCaptureWriter()
 	s.RunStream(ctx, req, writer)
 	return writer.FinalContent()
+}
+
+func withRunTimeout(ctx context.Context) (context.Context, func()) {
+	if conf.App == nil {
+		return ctx, func() {}
+	}
+	timeout := conf.App.Setting.RunTimeout()
+	if timeout <= 0 {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, timeout)
+}
+
+func isRunTimedOut(ctx context.Context, err error) bool {
+	return errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded)
+}
+
+func writeRunTimedOut(writer EventWriter, runID, threadID string) {
+	_ = writer.WriteEvent("error", &model.ChatResp{
+		RunID:        runID,
+		ThreadID:     threadID,
+		Role:         "assistant",
+		Content:      "运行超时，请缩小任务范围或稍后重试",
+		FinishReason: "timeout",
+	})
 }

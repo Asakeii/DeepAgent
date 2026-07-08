@@ -91,7 +91,7 @@ func (s *ResearchService) Run(ctx context.Context, req model.ChatRequest, writer
 			writeInterrupt(writer, req.ThreadID)
 			return ResearchRunResult{}, nil
 		}
-		if errors.Is(err, context.Canceled) {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return ResearchRunResult{}, err
 		}
 		_ = writer.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "run graph failed: " + err.Error()})
@@ -107,7 +107,7 @@ func (s *ResearchService) Run(ctx context.Context, req model.ChatRequest, writer
 				writeInterrupt(writer, req.ThreadID)
 				return ResearchRunResult{}, nil
 			}
-			if errors.Is(recvErr, context.Canceled) {
+			if errors.Is(recvErr, context.Canceled) || errors.Is(recvErr, context.DeadlineExceeded) {
 				return ResearchRunResult{}, recvErr
 			}
 			if recvErr != io.EOF {

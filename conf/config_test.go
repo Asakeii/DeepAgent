@@ -21,6 +21,7 @@ model:
     base_url: "vu"
 setting:
   max_step_num: 3
+  run_timeout_seconds: 120
 server:
   allowed_origins: ["https://app.example.com"]
   max_body_bytes: 2048
@@ -47,6 +48,9 @@ server:
 	}
 	if cfg.Model.VisionModel == nil || cfg.Model.VisionModel.DefaultModel != "vm" {
 		t.Fatalf("vision model not parsed: %+v", cfg.Model.VisionModel)
+	}
+	if cfg.Setting.RunTimeoutSeconds != 120 {
+		t.Fatalf("run timeout not parsed: %+v", cfg.Setting)
 	}
 	if cfg.Server.MaxBodyBytes != 2048 || len(cfg.Server.AllowedOrigins) != 1 || cfg.Server.AllowedOrigins[0] != "https://app.example.com" {
 		t.Fatalf("server config not parsed: %+v", cfg.Server)
@@ -92,5 +96,14 @@ func TestServerConfigSSEHeartbeatIntervalDisabled(t *testing.T) {
 	cfg := ServerConfig{SSEHeartbeatSeconds: -1}
 	if got := cfg.SSEHeartbeatInterval(); got != 0 {
 		t.Fatalf("heartbeat interval=%s, want disabled", got)
+	}
+}
+
+func TestSettingRunTimeout(t *testing.T) {
+	if got := (SettingConfig{}).RunTimeout(); got != 0 {
+		t.Fatalf("default run timeout=%s, want disabled", got)
+	}
+	if got := (SettingConfig{RunTimeoutSeconds: 30}).RunTimeout().Seconds(); got != 30 {
+		t.Fatalf("run timeout seconds=%v, want 30", got)
 	}
 }
