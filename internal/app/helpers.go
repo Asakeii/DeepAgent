@@ -10,6 +10,7 @@ import (
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
 	"deepAgent/internal/scheduler"
+	"deepAgent/internal/store"
 )
 
 func firstUserMessage(req model.ChatRequest) string {
@@ -72,4 +73,38 @@ func persistResearchMessages(ctx context.Context, threadID string, msgs []*schem
 		_ = infra.AppendMessageForCheckin(ctx, threadID, string(schema.User), msg.Content)
 	}
 	_ = infra.AppendMessageForCheckin(ctx, threadID, string(schema.Assistant), final)
+}
+
+func persistExplicitMemories(ctx context.Context, userID, threadID string, msgs []*schema.Message) {
+	for _, msg := range msgs {
+		if msg == nil || msg.Role != schema.User {
+			continue
+		}
+		content := explicitMemoryContent(msg.Content)
+		if content == "" {
+			continue
+		}
+		_, _ = store.CreateMemory(ctx, infra.DB, store.MemoryRecord{
+			UserID:     userID,
+			ThreadID:   threadID,
+			Kind:       store.MemoryKindPreference,
+			Content:    content,
+			Importance: 5,
+			Source:     "explicit_user_message",
+		})
+	}
+}
+
+func explicitMemoryContent(content string) string {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return ""
+	}
+	triggers := []string{"请记住", "记住", "以后请记得", "以后记得", "我的目标", "我的偏好", "我喜欢", "我不喜欢"}
+	for _, trigger := range triggers {
+		if strings.Contains(content, trigger) {
+			return content
+		}
+	}
+	return ""
 }

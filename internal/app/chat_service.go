@@ -49,6 +49,7 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 		_ = writer.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "thread forbidden"})
 		return
 	}
+	persistExplicitMemories(ctx, req.UserID, req.ThreadID, req.Messages)
 	if err := store.CreateRun(ctx, infra.DB, store.RunRecord{
 		ID:       req.RunID,
 		UserID:   req.UserID,

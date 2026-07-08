@@ -115,6 +115,34 @@ type RunMetricsResp struct {
 	AvgToolDurationMS int64   `json:"avg_tool_duration_ms"`
 }
 
+type MemoryResp struct {
+	ID         int64  `json:"id"`
+	UserID     string `json:"user_id,omitempty"`
+	ThreadID   string `json:"thread_id,omitempty"`
+	Kind       string `json:"kind"`
+	Content    string `json:"content"`
+	Importance int    `json:"importance"`
+	Source     string `json:"source,omitempty"`
+	CreatedAt  string `json:"created_at,omitempty"`
+	UpdatedAt  string `json:"updated_at,omitempty"`
+}
+
+type CreateMemoryRequest struct {
+	ThreadID   string `json:"thread_id,omitempty"`
+	Kind       string `json:"kind,omitempty"`
+	Content    string `json:"content"`
+	Importance int    `json:"importance,omitempty"`
+	Source     string `json:"source,omitempty"`
+}
+
+type CreateMemoryResponse struct {
+	Memory *MemoryResp `json:"memory"`
+}
+
+type ListMemoriesResponse struct {
+	Memories []*MemoryResp `json:"memories"`
+}
+
 // ChatResp 是 SSE 事件里返回给前端的统一消息结构。
 type ChatResp struct {
 	RunID          string           `json:"run_id,omitempty"`
