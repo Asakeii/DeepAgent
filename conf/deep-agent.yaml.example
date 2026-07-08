@@ -45,6 +45,8 @@ database:
 server:
   allowed_origins: ["http://localhost:5173", "http://127.0.0.1:5173"]
   max_body_bytes: 1048576
+  image_max_bytes: 5242880
+  image_allowed_types: ["image/jpeg", "image/png", "image/webp", "image/gif"]
   # Empty api_keys disables API-key auth for local development.
   # Configure one or more keys in production and pass Authorization: Bearer <key>.
   api_keys: []

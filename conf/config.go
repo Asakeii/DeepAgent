@@ -11,6 +11,7 @@ import (
 )
 
 const DefaultSSEHeartbeatSeconds = 15
+const DefaultImageMaxBytes int64 = 5 << 20
 
 // Config 对应 conf/deep-agent.yaml 的整体结构。
 // 配置分为 MCP 服务、模型服务和运行参数三部分。
@@ -63,6 +64,8 @@ type SettingConfig struct {
 type ServerConfig struct {
 	AllowedOrigins      []string `yaml:"allowed_origins"`
 	MaxBodyBytes        int64    `yaml:"max_body_bytes"`
+	ImageMaxBytes       int64    `yaml:"image_max_bytes"`
+	ImageAllowedTypes   []string `yaml:"image_allowed_types"`
 	APIKeys             []string `yaml:"api_keys"`
 	RateLimitPerMinute  int      `yaml:"rate_limit_per_minute"`
 	SSEHeartbeatSeconds int      `yaml:"sse_heartbeat_seconds"`
@@ -103,6 +106,12 @@ func Load(ctx context.Context) (*Config, error) {
 	}
 	if cfg.Server.MaxBodyBytes <= 0 {
 		cfg.Server.MaxBodyBytes = 1 << 20
+	}
+	if cfg.Server.ImageMaxBytes <= 0 {
+		cfg.Server.ImageMaxBytes = DefaultImageMaxBytes
+	}
+	if len(cfg.Server.ImageAllowedTypes) == 0 {
+		cfg.Server.ImageAllowedTypes = []string{"image/jpeg", "image/png", "image/webp", "image/gif"}
 	}
 	if len(cfg.Server.AllowedOrigins) == 0 {
 		cfg.Server.AllowedOrigins = []string{"http://localhost:5173", "http://127.0.0.1:5173"}

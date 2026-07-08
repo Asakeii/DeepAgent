@@ -113,6 +113,16 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 			slog.Int64("duration_ms", time.Since(startedAt).Milliseconds()),
 		)
 	}()
+	if req.ImageBase64 != "" {
+		if err := validateImageInput(req.ImageBase64); err != nil {
+			_ = runWriter.WriteEvent("error", &model.ChatResp{
+				Role:         "assistant",
+				Content:      "图片输入不符合安全要求: " + err.Error(),
+				FinishReason: "invalid_image",
+			})
+			return
+		}
+	}
 
 	detach := s.Reminders.AttachStream(runCtx, req.ThreadID, runWriter)
 	defer detach()
