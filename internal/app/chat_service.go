@@ -219,7 +219,7 @@ func persistResearchArtifact(ctx context.Context, req model.ChatRequest, final s
 		"thread_id": req.ThreadID,
 		"mode":      "research",
 	})
-	_, err := store.CreateArtifact(ctx, infra.DB, store.ArtifactRecord{
+	artifactID, err := store.CreateArtifact(ctx, infra.DB, store.ArtifactRecord{
 		UserID:   req.UserID,
 		ThreadID: req.ThreadID,
 		RunID:    req.RunID,
@@ -230,5 +230,9 @@ func persistResearchArtifact(ctx context.Context, req model.ChatRequest, final s
 		Metadata: metadata,
 		Source:   store.ArtifactSourceAgent,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	citations := citationRecordsFromMarkdown(artifactID, req, final)
+	return store.CreateArtifactCitations(ctx, infra.DB, citations)
 }

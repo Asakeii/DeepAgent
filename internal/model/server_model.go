@@ -172,6 +172,23 @@ type ListArtifactsResponse struct {
 	Artifacts []*ArtifactResp `json:"artifacts"`
 }
 
+type CitationResp struct {
+	ID         int64  `json:"id"`
+	ArtifactID int64  `json:"artifact_id"`
+	UserID     string `json:"user_id,omitempty"`
+	ThreadID   string `json:"thread_id,omitempty"`
+	RunID      string `json:"run_id,omitempty"`
+	Title      string `json:"title"`
+	URL        string `json:"url"`
+	Quote      string `json:"quote,omitempty"`
+	Position   int    `json:"position"`
+	CreatedAt  string `json:"created_at,omitempty"`
+}
+
+type ListCitationsResponse struct {
+	Citations []*CitationResp `json:"citations"`
+}
+
 // ChatResp 是 SSE 事件里返回给前端的统一消息结构。
 type ChatResp struct {
 	RunID          string           `json:"run_id,omitempty"`

@@ -497,7 +497,7 @@ AppendMessage:
 
 - [ ] memory 分层。
 - [x] report artifact。
-- [ ] citation 存储。
+- [x] citation 存储。
 - [ ] reminder multi-connection。
 - [ ] run cancellation。
 - [ ] tool risk policy。

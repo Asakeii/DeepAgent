@@ -1,0 +1,6 @@
+- [x] 新增 artifact citation 持久化表和迁移。
+- [x] 从 markdown report 中提取 URL citation。
+- [x] report artifact 创建后自动保存 citation。
+- [x] 新增 `/api/artifact-citations` 查询接口。
+- [x] 补充 citation 提取、store 和 ChatService 测试。
+- [ ] 后续：引入 citation 质量评测与来源可用性检查。

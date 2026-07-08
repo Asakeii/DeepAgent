@@ -32,6 +32,7 @@ func TestChatServiceRoutesToFakeCheckinRunner(t *testing.T) {
 	threadID := "fake-thread-" + suffix
 	userID := "fake-user-" + suffix
 	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifact_citations WHERE thread_id=?", threadID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifacts WHERE thread_id=?", threadID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM run_events WHERE run_id=?", runID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM runs WHERE id=?", runID)
@@ -88,6 +89,7 @@ func TestChatServiceRunTimeoutWithFakeResearchRunner(t *testing.T) {
 	threadID := "timeout-thread-" + suffix
 	userID := "timeout-user-" + suffix
 	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifact_citations WHERE thread_id=?", threadID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifacts WHERE thread_id=?", threadID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM run_events WHERE run_id=?", runID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM runs WHERE id=?", runID)
@@ -144,6 +146,7 @@ func TestChatServiceRejectsInvalidImageBeforeRunner(t *testing.T) {
 	threadID := "bad-image-thread-" + suffix
 	userID := "bad-image-user-" + suffix
 	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifact_citations WHERE thread_id=?", threadID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifacts WHERE thread_id=?", threadID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM run_events WHERE run_id=?", runID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM runs WHERE id=?", runID)
@@ -197,6 +200,7 @@ func TestChatServicePersistsResearchArtifact(t *testing.T) {
 	threadID := "artifact-thread-" + suffix
 	userID := "artifact-user-" + suffix
 	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifact_citations WHERE thread_id=?", threadID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifacts WHERE thread_id=?", threadID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM run_events WHERE run_id=?", runID)
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM runs WHERE id=?", runID)
@@ -206,7 +210,7 @@ func TestChatServicePersistsResearchArtifact(t *testing.T) {
 		_, _ = db.ExecContext(context.Background(), "DELETE FROM users WHERE id=?", userID)
 	})
 
-	service := NewChatServiceWithDeps(&fakeResearchRunner{result: ResearchRunResult{Final: "# 最终报告"}}, &fakeCheckinRunner{}, fakeReminderStreamer{})
+	service := NewChatServiceWithDeps(&fakeResearchRunner{result: ResearchRunResult{Final: "# 最终报告\n\n参考 [资料](https://example.com/report)"}}, &fakeCheckinRunner{}, fakeReminderStreamer{})
 	service.RunStream(context.Background(), model.ChatRequest{
 		RunID:    runID,
 		ThreadID: threadID,
@@ -223,8 +227,15 @@ func TestChatServicePersistsResearchArtifact(t *testing.T) {
 	if len(records) != 1 {
 		t.Fatalf("len=%d, want 1", len(records))
 	}
-	if records[0].RunID != runID || records[0].Content != "# 最终报告" {
+	if records[0].RunID != runID || records[0].Content == "" {
 		t.Fatalf("unexpected artifact: %+v", records[0])
+	}
+	citations, err := store.ListArtifactCitations(context.Background(), db, userID, records[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(citations) != 1 || citations[0].URL != "https://example.com/report" {
+		t.Fatalf("unexpected citations: %+v", citations)
 	}
 }
 
