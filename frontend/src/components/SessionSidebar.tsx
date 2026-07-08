@@ -7,9 +7,11 @@ interface SessionSidebarProps {
   activeThreadId: string;
   isOpen: boolean;
   loading: boolean;
+  searchQuery: string;
   onClose: () => void;
   onNew: () => void;
   onSelect: (threadId: string) => void;
+  onSearchChange: (query: string) => void;
 }
 
 export function SessionSidebar({
@@ -17,9 +19,11 @@ export function SessionSidebar({
   activeThreadId,
   isOpen,
   loading,
+  searchQuery,
   onClose,
   onNew,
   onSelect,
+  onSearchChange,
 }: SessionSidebarProps) {
   return (
     <aside className={`session-sidebar ${isOpen ? "is-open" : ""}`} aria-label="历史会话">
@@ -38,10 +42,16 @@ export function SessionSidebar({
         新对话
       </button>
 
-      <div className="sidebar-search" aria-hidden="true">
+      <label className="sidebar-search">
         <Search size={15} />
-        <span>按最近活动排序</span>
-      </div>
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder="搜索会话"
+          aria-label="搜索历史会话"
+        />
+      </label>
 
       <div className="session-list">
         {loading ? (
@@ -52,8 +62,8 @@ export function SessionSidebar({
           </>
         ) : sessions.length === 0 ? (
           <div className="empty-panel">
-            <strong>还没有记录</strong>
-            <span>完成打卡或研究后，对话会保存在这里。</span>
+            <strong>{searchQuery.trim() ? "没有匹配会话" : "还没有记录"}</strong>
+            <span>{searchQuery.trim() ? "换个关键词再试试。" : "完成打卡或研究后，对话会保存在这里。"}</span>
           </div>
         ) : (
           sessions.map((session) => (

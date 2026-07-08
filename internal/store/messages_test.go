@@ -85,6 +85,43 @@ func TestAppendMessageConcurrentTurnIdxUnique(t *testing.T) {
 	_, _ = db.ExecContext(ctx, "DELETE FROM messages WHERE thread_id=?", tid)
 }
 
+func TestSearchThreadsForUser(t *testing.T) {
+	db := DBForTest(t)
+	if db == nil {
+		t.Skip("mysql not available")
+	}
+	ctx := context.Background()
+	userID := "session-search-user-" + randomSuffix()
+	threadMatch := "session-search-match-" + randomSuffix()
+	threadOther := "session-search-other-" + randomSuffix()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, "DELETE FROM messages WHERE thread_id IN (?, ?)", threadMatch, threadOther)
+		_, _ = db.ExecContext(ctx, "DELETE FROM threads WHERE id IN (?, ?)", threadMatch, threadOther)
+		_, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id=?", userID)
+	})
+
+	if err := EnsureThread(ctx, db, threadMatch, userID, "研究 Agent 成熟化", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureThread(ctx, db, threadOther, userID, "普通会话", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := AppendMessage(ctx, db, threadMatch, string(schema.User), "帮我分析多 Pod 部署"); err != nil {
+		t.Fatal(err)
+	}
+	if err := AppendMessage(ctx, db, threadOther, string(schema.User), "记录今天跑步"); err != nil {
+		t.Fatal(err)
+	}
+
+	threads, err := SearchThreadsForUser(ctx, db, userID, "多 Pod", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(threads) != 1 || threads[0].ThreadID != threadMatch {
+		t.Fatalf("unexpected search result: %+v", threads)
+	}
+}
+
 // randomSuffix 给测试用唯一 thread_id；不在生产路径。
 func randomSuffix() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())

@@ -26,6 +26,7 @@ export function App() {
   const [threadId, setThreadId] = useState(() => newThreadId());
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionQuery, setSessionQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia("(min-width: 900px)").matches);
   const [view, setView] = useState<"workspace" | "reminders">("workspace");
   const [items, setItems] = useState<TranscriptItem[]>([]);
@@ -46,13 +47,13 @@ export function App() {
   const refreshSessions = useCallback(async () => {
     setSessionsLoading(true);
     try {
-      setSessions(await listSessions());
+      setSessions(await listSessions(sessionQuery));
     } catch {
       setSessions([]);
     } finally {
       setSessionsLoading(false);
     }
-  }, []);
+  }, [sessionQuery]);
 
   useEffect(() => {
     void refreshSessions();
@@ -494,9 +495,11 @@ export function App() {
         activeThreadId={threadId}
         isOpen={sidebarOpen}
         loading={sessionsLoading}
+        searchQuery={sessionQuery}
         onClose={() => setSidebarOpen(false)}
         onNew={newChat}
         onSelect={selectSession}
+        onSearchChange={setSessionQuery}
       />
 
       {sidebarOpen ? <button className="scrim" type="button" onClick={() => setSidebarOpen(false)} aria-label="关闭历史" /> : null}

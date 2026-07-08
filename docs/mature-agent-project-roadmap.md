@@ -503,7 +503,7 @@ AppendMessage:
 - [ ] tool risk policy。
 - [x] prompt injection 防护。
 - [x] 用户设置。
-- [ ] 前端 session search。
+- [x] 前端 session search。
 
 ## 7. P2 任务清单
 

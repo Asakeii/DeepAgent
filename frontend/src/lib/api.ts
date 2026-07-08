@@ -5,8 +5,10 @@ export interface StreamEvent {
   data: ChatEventPayload;
 }
 
-export async function listSessions(): Promise<SessionInfo[]> {
-  const response = await fetch("/api/sessions?limit=50");
+export async function listSessions(query = ""): Promise<SessionInfo[]> {
+  const params = new URLSearchParams({ limit: "50" });
+  if (query.trim()) params.set("q", query.trim());
+  const response = await fetch(`/api/sessions?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`Failed to load sessions (${response.status})`);
   }

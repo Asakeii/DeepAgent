@@ -139,6 +139,28 @@ func ListThreads(ctx context.Context, db *sql.DB, limit int) ([]ThreadInfo, erro
 
 func ListThreadsForUser(ctx context.Context, db *sql.DB, userID string, limit int) ([]ThreadInfo, error) {
 	userID = NormalizeUserID(userID)
+	return SearchThreadsForUser(ctx, db, userID, "", limit)
+}
+
+func SearchThreadsForUser(ctx context.Context, db *sql.DB, userID, query string, limit int) ([]ThreadInfo, error) {
+	userID = NormalizeUserID(userID)
+	query = strings.TrimSpace(query)
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	where := `WHERE t.user_id=?`
+	args := []any{userID}
+	if query != "" {
+		like := "%" + strings.ReplaceAll(query, "%", `\%`) + "%"
+		where += ` AND (t.id LIKE ? OR t.title LIKE ? OR EXISTS (
+			SELECT 1 FROM messages sm WHERE sm.thread_id=t.id AND sm.content LIKE ?
+		))`
+		args = append(args, like, like, like)
+	}
+	args = append(args, limit)
 	rows, err := db.QueryContext(ctx,
 		`SELECT t.id,
 		 COALESCE(NULLIF(t.title, ''), (SELECT content FROM messages m2 WHERE m2.thread_id=t.id AND role='user' ORDER BY turn_idx ASC LIMIT 1), '') AS first_msg,
@@ -146,9 +168,9 @@ func ListThreadsForUser(ctx context.Context, db *sql.DB, userID string, limit in
 		 COUNT(m.id) AS msg_count
 		 FROM threads t
 		 LEFT JOIN messages m ON m.thread_id=t.id
-		 WHERE t.user_id=?
+		 `+where+`
 		 GROUP BY t.id, t.title, t.updated_at
-		 ORDER BY last_at DESC LIMIT ?`, userID, limit)
+		 ORDER BY last_at DESC LIMIT ?`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list user threads: %w", err)
 	}
