@@ -53,7 +53,7 @@ func (s *ResearchService) Run(ctx context.Context, req model.ChatRequest, writer
 		return &model.State{
 			Messages:                      req.Messages,
 			Goto:                          consts.Coordinator,
-			Locale:                        "zh-CN",
+			Locale:                        requestLocale(req),
 			MaxPlanIterations:             maxPlanIterations,
 			MaxStepNum:                    maxStepNum,
 			AutoAcceptedPlan:              req.AutoAcceptedPlan,

@@ -70,6 +70,9 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 		_ = writer.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "thread forbidden"})
 		return
 	}
+	if err := applyUserSettingsDefaults(ctx, &req); err != nil {
+		runLog.ErrorContext(ctx, "apply user settings failed", slog.Any("error", err))
+	}
 	persistExplicitMemories(ctx, req.UserID, req.ThreadID, req.Messages)
 	originalMessages := append([]*schema.Message(nil), req.Messages...)
 	agentMessages, err := messagesWithUserMemories(ctx, req.UserID, req.Messages)

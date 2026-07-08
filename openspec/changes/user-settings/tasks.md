@@ -1,0 +1,7 @@
+- [x] 新增 `user_settings` 表和迁移。
+- [x] 新增 user settings store。
+- [x] 新增 `/api/settings` 查询与更新接口。
+- [x] ChatService 读取用户设置并填充运行默认值。
+- [x] 补充 store 和 ChatService 集成测试。
+- [ ] 后续：前端设置页。
+- [ ] 后续：将 `auto_accepted_plan` 请求字段改为可区分未设置的结构。

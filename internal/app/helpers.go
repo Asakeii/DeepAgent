@@ -27,6 +27,38 @@ func firstUserMessage(req model.ChatRequest) string {
 	return ""
 }
 
+func applyUserSettingsDefaults(ctx context.Context, req *model.ChatRequest) error {
+	if req == nil {
+		return nil
+	}
+	settings, err := store.GetUserSettings(ctx, infra.DB, req.UserID)
+	if err != nil {
+		return err
+	}
+	if req.Locale == "" {
+		req.Locale = settings.Locale
+	}
+	if req.MaxPlanIterations <= 0 && settings.MaxPlanIterations.Valid {
+		req.MaxPlanIterations = int(settings.MaxPlanIterations.Int64)
+	}
+	if req.MaxStepNum <= 0 && settings.MaxStepNum.Valid {
+		req.MaxStepNum = int(settings.MaxStepNum.Int64)
+	}
+	if req.EnableBackgroundInvestigation == nil && settings.EnableBackgroundInvestigation.Valid {
+		v := settings.EnableBackgroundInvestigation.Bool
+		req.EnableBackgroundInvestigation = &v
+	}
+	return nil
+}
+
+func requestLocale(req model.ChatRequest) string {
+	locale := strings.TrimSpace(req.Locale)
+	if locale == "" {
+		return store.DefaultLocale
+	}
+	return locale
+}
+
 func writeInterrupt(writer EventWriter, threadID string) {
 	_ = writer.WriteEvent("interrupt", &model.ChatResp{
 		ThreadID:     threadID,

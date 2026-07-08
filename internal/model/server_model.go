@@ -10,6 +10,7 @@ type ChatRequest struct {
 	UserID                        string            `json:"user_id,omitempty"`
 	RunID                         string            `json:"run_id,omitempty"`
 	ThreadID                      string            `json:"thread_id,omitempty"`
+	Locale                        string            `json:"locale,omitempty"`
 	MaxPlanIterations             int               `json:"max_plan_iterations,omitempty"`
 	MaxStepNum                    int               `json:"max_step_num,omitempty"`
 	AutoAcceptedPlan              bool              `json:"auto_accepted_plan,omitempty"`
@@ -187,6 +188,30 @@ type CitationResp struct {
 
 type ListCitationsResponse struct {
 	Citations []*CitationResp `json:"citations"`
+}
+
+type UserSettingsResp struct {
+	UserID                        string `json:"user_id,omitempty"`
+	Locale                        string `json:"locale"`
+	Timezone                      string `json:"timezone"`
+	MaxPlanIterations             *int   `json:"max_plan_iterations,omitempty"`
+	MaxStepNum                    *int   `json:"max_step_num,omitempty"`
+	EnableBackgroundInvestigation *bool  `json:"enable_background_investigation,omitempty"`
+	AutoAcceptPlan                *bool  `json:"auto_accept_plan,omitempty"`
+	UpdatedAt                     string `json:"updated_at,omitempty"`
+}
+
+type UpdateUserSettingsRequest struct {
+	Locale                        *string `json:"locale,omitempty"`
+	Timezone                      *string `json:"timezone,omitempty"`
+	MaxPlanIterations             *int    `json:"max_plan_iterations,omitempty"`
+	MaxStepNum                    *int    `json:"max_step_num,omitempty"`
+	EnableBackgroundInvestigation *bool   `json:"enable_background_investigation,omitempty"`
+	AutoAcceptPlan                *bool   `json:"auto_accept_plan,omitempty"`
+}
+
+type UserSettingsResponse struct {
+	Settings *UserSettingsResp `json:"settings"`
 }
 
 // ChatResp 是 SSE 事件里返回给前端的统一消息结构。

@@ -239,6 +239,68 @@ func TestChatServicePersistsResearchArtifact(t *testing.T) {
 	}
 }
 
+func TestChatServiceAppliesUserSettingsDefaults(t *testing.T) {
+	db := appDBForTest(t)
+	if db == nil {
+		t.Skip("TEST_MYSQL_DSN not set")
+	}
+	prevDB := infra.DB
+	infra.DB = db
+	t.Cleanup(func() {
+		infra.DB = prevDB
+	})
+
+	suffix := time.Now().Format("20060102150405.000000000")
+	runID := "settings-run-" + suffix
+	threadID := "settings-thread-" + suffix
+	userID := "settings-user-" + suffix
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifact_citations WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifacts WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM run_events WHERE run_id=?", runID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM runs WHERE id=?", runID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM messages WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM memories WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM threads WHERE id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM user_settings WHERE user_id=?", userID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM users WHERE id=?", userID)
+	})
+	enableBackground := true
+	if err := store.UpsertUserSettings(context.Background(), db, store.UserSettingsRecord{
+		UserID:                        userID,
+		Locale:                        "en-US",
+		MaxPlanIterations:             sql.NullInt64{Int64: 4, Valid: true},
+		MaxStepNum:                    sql.NullInt64{Int64: 6, Valid: true},
+		EnableBackgroundInvestigation: sql.NullBool{Bool: enableBackground, Valid: true},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	research := &fakeResearchRunner{result: ResearchRunResult{Final: "ok"}}
+	service := NewChatServiceWithDeps(research, &fakeCheckinRunner{}, fakeReminderStreamer{})
+	service.RunStream(context.Background(), model.ChatRequest{
+		RunID:    runID,
+		ThreadID: threadID,
+		UserID:   userID,
+		Messages: []*schema.Message{
+			schema.UserMessage("研究用户设置默认值"),
+		},
+	}, NewCaptureWriter())
+
+	if !research.called {
+		t.Fatal("research runner was not called")
+	}
+	if research.req.Locale != "en-US" {
+		t.Fatalf("locale=%q, want en-US", research.req.Locale)
+	}
+	if research.req.MaxPlanIterations != 4 || research.req.MaxStepNum != 6 {
+		t.Fatalf("unexpected limits: maxPlan=%d maxStep=%d", research.req.MaxPlanIterations, research.req.MaxStepNum)
+	}
+	if research.req.EnableBackgroundInvestigation == nil || !*research.req.EnableBackgroundInvestigation {
+		t.Fatalf("background setting not applied: %+v", research.req.EnableBackgroundInvestigation)
+	}
+}
+
 func appDBForTest(t *testing.T) *sql.DB {
 	t.Helper()
 	dsn := os.Getenv("TEST_MYSQL_DSN")
@@ -261,12 +323,14 @@ func appDBForTest(t *testing.T) *sql.DB {
 
 type fakeResearchRunner struct {
 	called bool
+	req    model.ChatRequest
 	result ResearchRunResult
 	err    error
 }
 
 func (r *fakeResearchRunner) Run(ctx context.Context, req model.ChatRequest, writer EventWriter) (ResearchRunResult, error) {
 	r.called = true
+	r.req = req
 	return r.result, r.err
 }
 

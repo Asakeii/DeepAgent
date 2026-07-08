@@ -60,6 +60,7 @@ export interface ChatEventPayload {
 export interface StreamRequest {
   messages: ChatMessage[];
   thread_id: string;
+  locale?: string;
   auto_accepted_plan: boolean;
   interrupt_feedback?: "accepted" | "edit_plan";
   image_base64?: string;
