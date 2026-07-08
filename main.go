@@ -179,6 +179,8 @@ func runServer() {
 	mux.HandleFunc("/chat/stream", handler.ChatStreamEino)
 	mux.HandleFunc("/wechat/callback", handler.WechatCallback)
 	mux.HandleFunc("/v1/chat/completions", handler.OpenAICompatible)
+	mux.HandleFunc("/healthz", handler.Healthz)
+	mux.HandleFunc("/readyz", handler.Readyz)
 	// 前端静态文件
 	mux.HandleFunc("/api/sessions", handler.ListSessions)
 	mux.HandleFunc("/api/messages", handler.LoadMessages)
