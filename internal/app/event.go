@@ -11,6 +11,7 @@ import (
 
 	"deepAgent/internal/model"
 	"deepAgent/internal/observability"
+	"deepAgent/internal/security"
 	"deepAgent/internal/store"
 )
 
@@ -157,6 +158,7 @@ func (w *RunEventWriter) record(event string, payload any) {
 		w.logger().ErrorContext(context.Background(), "marshal run event failed", slog.String("event", event), slog.Any("error", err))
 		return
 	}
+	b = security.RedactJSON(b)
 	agentName := ""
 	if resp, ok := payload.(*model.ChatResp); ok && resp != nil {
 		agentName = resp.Agent

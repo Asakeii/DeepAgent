@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+
+	"deepAgent/internal/security"
 )
 
 const (
@@ -69,6 +71,7 @@ func StartToolAudit(ctx context.Context, db *sql.DB, record ToolAuditRecord) (in
 	if len(record.Arguments) == 0 {
 		record.Arguments = json.RawMessage(`{}`)
 	}
+	record.Arguments = security.RedactJSON(record.Arguments)
 	res, err := db.ExecContext(ctx,
 		`INSERT INTO tool_audit_logs (run_id, thread_id, user_id, tool_name, risk, status, arguments)
 		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -98,7 +101,7 @@ func CompleteToolAudit(ctx context.Context, db *sql.DB, id int64, status, result
 		`UPDATE tool_audit_logs
 		 SET status=?, result=?, error=?, duration_ms=?, completed_at=CURRENT_TIMESTAMP
 		 WHERE id=?`,
-		status, trimAuditText(result), nullableString(errorText), durationMS, id,
+		status, trimAuditText(security.RedactString(result)), nullableString(security.RedactString(errorText)), durationMS, id,
 	)
 	if err != nil {
 		return fmt.Errorf("complete tool audit: %w", err)
