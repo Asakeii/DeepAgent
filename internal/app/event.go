@@ -6,10 +6,11 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"sync"
 
 	"deepAgent/internal/model"
+	"deepAgent/internal/observability"
 	"deepAgent/internal/store"
 )
 
@@ -153,7 +154,7 @@ func (w *RunEventWriter) record(event string, payload any) {
 	}
 	b, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("[run_event] marshal event=%s run=%s: %v", event, w.runID, err)
+		w.logger().ErrorContext(context.Background(), "marshal run event failed", slog.String("event", event), slog.Any("error", err))
 		return
 	}
 	agentName := ""
@@ -168,8 +169,12 @@ func (w *RunEventWriter) record(event string, payload any) {
 		Agent:     agentName,
 		Payload:   b,
 	}); err != nil {
-		log.Printf("[run_event] append event=%s run=%s: %v", event, w.runID, err)
+		w.logger().ErrorContext(context.Background(), "append run event failed", slog.String("event", event), slog.Any("error", err))
 	}
+}
+
+func (w *RunEventWriter) logger() *slog.Logger {
+	return observability.RunLogger(w.runID, w.threadID, w.userID)
 }
 
 func newRunID() string {

@@ -2,12 +2,13 @@ package app
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
+	"deepAgent/internal/observability"
 	"deepAgent/internal/store"
 )
 
@@ -17,6 +18,7 @@ func withRunCancellation(ctx context.Context, runID string) (context.Context, fu
 	if runID == "" || infra.DB == nil {
 		return ctx, func() {}
 	}
+	logger := observability.RunLogger(runID, "", "")
 	runCtx, cancel := context.WithCancel(ctx)
 	stopCh := make(chan struct{})
 	doneCh := make(chan struct{})
@@ -35,7 +37,7 @@ func withRunCancellation(ctx context.Context, runID string) (context.Context, fu
 			case <-ticker.C:
 				cancelled, err := store.IsRunCancelled(context.Background(), infra.DB, runID)
 				if err != nil {
-					log.Printf("[run] cancellation check run=%s: %v", runID, err)
+					logger.ErrorContext(context.Background(), "run cancellation check failed", slog.Any("error", err))
 					continue
 				}
 				if cancelled {
@@ -62,7 +64,7 @@ func isRunCancelled(runID string) bool {
 	}
 	cancelled, err := store.IsRunCancelled(context.Background(), infra.DB, runID)
 	if err != nil {
-		log.Printf("[run] cancellation status run=%s: %v", runID, err)
+		observability.RunLogger(runID, "", "").ErrorContext(context.Background(), "run cancellation status failed", slog.Any("error", err))
 		return false
 	}
 	return cancelled

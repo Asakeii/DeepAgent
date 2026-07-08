@@ -22,11 +22,13 @@ import (
 	"deepAgent/internal/handler"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
+	"deepAgent/internal/observability"
 	"deepAgent/internal/scheduler"
 	"deepAgent/internal/tool"
 )
 
 func main() {
+	observability.ConfigureJSONLogger(os.Stderr)
 	ctx := context.Background()
 
 	cfg, err := conf.Load(ctx)

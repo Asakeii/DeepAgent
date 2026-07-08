@@ -2,12 +2,14 @@ package app
 
 import (
 	"context"
-	"log"
+	"log/slog"
+	"time"
 
 	"github.com/cloudwego/eino/schema"
 
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
+	"deepAgent/internal/observability"
 	"deepAgent/internal/store"
 	"deepAgent/internal/toolruntime"
 )
@@ -50,13 +52,18 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 	if req.ImageBase64 != "" {
 		mode = "image"
 	}
+	startedAt := time.Now()
+	runLog := observability.RunLogger(req.RunID, req.ThreadID, req.UserID).With(slog.String("mode", mode))
+	runLog.InfoContext(ctx, "chat run accepted")
 	if err := store.EnsureThread(ctx, infra.DB, req.ThreadID, req.UserID, firstUserMessage(req), mode); err != nil {
-		log.Printf("[thread] ensure thread=%s user=%s: %v", req.ThreadID, req.UserID, err)
+		runLog.ErrorContext(ctx, "ensure thread failed", slog.Any("error", err))
 	}
 	if ok, err := store.ThreadBelongsToUser(ctx, infra.DB, req.ThreadID, req.UserID); err != nil {
+		runLog.ErrorContext(ctx, "thread ownership check failed", slog.Any("error", err))
 		_ = writer.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "thread ownership check failed: " + err.Error()})
 		return
 	} else if !ok {
+		runLog.WarnContext(ctx, "thread ownership rejected")
 		_ = writer.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "thread forbidden"})
 		return
 	}
@@ -64,7 +71,7 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 	originalMessages := append([]*schema.Message(nil), req.Messages...)
 	agentMessages, err := messagesWithUserMemories(ctx, req.UserID, req.Messages)
 	if err != nil {
-		log.Printf("[memory] inject user=%s thread=%s: %v", req.UserID, req.ThreadID, err)
+		runLog.ErrorContext(ctx, "inject user memories failed", slog.Any("error", err))
 	} else {
 		req.Messages = agentMessages
 	}
@@ -74,7 +81,7 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 		ThreadID: req.ThreadID,
 		Mode:     mode,
 	}); err != nil {
-		log.Printf("[run] create run=%s thread=%s: %v", req.RunID, req.ThreadID, err)
+		runLog.ErrorContext(ctx, "create run failed", slog.Any("error", err))
 	}
 	runCtx, stopCancellationWatcher := withRunCancellation(ctx, req.RunID)
 	defer stopCancellationWatcher()
@@ -94,8 +101,13 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 			errText = captured
 		}
 		if err := store.CompleteRun(context.Background(), infra.DB, req.RunID, status, errText); err != nil {
-			log.Printf("[run] complete run=%s status=%s: %v", req.RunID, status, err)
+			runLog.ErrorContext(context.Background(), "complete run failed", slog.String("status", status), slog.Any("error", err))
+			return
 		}
+		runLog.InfoContext(context.Background(), "chat run completed",
+			slog.String("status", status),
+			slog.Int64("duration_ms", time.Since(startedAt).Milliseconds()),
+		)
 	}()
 
 	detach := s.Reminders.AttachStream(runCtx, req.ThreadID, runWriter)
