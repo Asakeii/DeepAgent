@@ -122,6 +122,7 @@ func handleWechatMessage(w http.ResponseWriter, r *http.Request) {
 
 	replyContent := strings.TrimSpace(app.NewChatService().RunToText(r.Context(), model.ChatRequest{
 		Messages:                      []*schema.Message{schema.UserMessage(userMsg)},
+		UserID:                        "wechat:" + threadID,
 		ThreadID:                      threadID,
 		AutoAcceptedPlan:              true,
 		EnableBackgroundInvestigation: boolPtr(false),

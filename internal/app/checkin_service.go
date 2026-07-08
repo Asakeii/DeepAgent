@@ -2,18 +2,23 @@ package app
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"sync"
 
 	"github.com/cloudwego/eino/schema"
 
 	"deepAgent/internal/agent"
+	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
 	"deepAgent/internal/scheduler"
+	"deepAgent/internal/store"
 )
 
 type CheckinService struct{}
 
 type CheckinTurnRequest struct {
+	UserID   string
 	ThreadID string
 	Messages []*schema.Message
 }
@@ -28,6 +33,15 @@ func NewCheckinService() *CheckinService {
 }
 
 func (s *CheckinService) RunTurn(ctx context.Context, req CheckinTurnRequest) (CheckinTurnResult, error) {
+	req.UserID = store.NormalizeUserID(req.UserID)
+	if err := store.EnsureThread(ctx, infra.DB, req.ThreadID, req.UserID, firstCheckinUserMessage(req), "checkin"); err != nil {
+		log.Printf("[thread] ensure checkin thread=%s user=%s: %v", req.ThreadID, req.UserID, err)
+	}
+	if ok, err := store.ThreadBelongsToUser(ctx, infra.DB, req.ThreadID, req.UserID); err != nil {
+		return CheckinTurnResult{}, err
+	} else if !ok {
+		return CheckinTurnResult{}, fmt.Errorf("thread forbidden")
+	}
 	var reminderEvents []scheduler.ReminderEvent
 	var reminderMu sync.Mutex
 	checkinCtx := scheduler.WithEventSink(ctx, func(event scheduler.ReminderEvent) {
@@ -45,6 +59,15 @@ func (s *CheckinService) RunTurn(ctx context.Context, req CheckinTurnRequest) (C
 	events := append([]scheduler.ReminderEvent(nil), reminderEvents...)
 	reminderMu.Unlock()
 	return CheckinTurnResult{Response: resp, ReminderEvents: events}, nil
+}
+
+func firstCheckinUserMessage(req CheckinTurnRequest) string {
+	for _, msg := range req.Messages {
+		if msg != nil && msg.Role == schema.User && msg.Content != "" {
+			return msg.Content
+		}
+	}
+	return ""
 }
 
 func (s *CheckinService) AnalyzeImage(ctx context.Context, req model.ChatRequest) (string, error) {

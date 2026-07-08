@@ -11,6 +11,7 @@ import (
 
 // ListSessions 返回会话列表。
 func ListSessions(w http.ResponseWriter, r *http.Request) {
+	userID := requestUserID(r)
 	limit := 50
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if n, err := strconv.Atoi(l); err == nil && n > 0 {
@@ -18,7 +19,7 @@ func ListSessions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	threads, err := store.ListThreads(r.Context(), infra.DB, limit)
+	threads, err := store.ListThreadsForUser(r.Context(), infra.DB, userID, limit)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -35,9 +36,17 @@ func ListSessions(w http.ResponseWriter, r *http.Request) {
 
 // LoadMessages 返回某 thread 的历史消息。
 func LoadMessages(w http.ResponseWriter, r *http.Request) {
+	userID := requestUserID(r)
 	threadID := r.URL.Query().Get("thread_id")
 	if threadID == "" {
 		http.Error(w, "thread_id required", http.StatusBadRequest)
+		return
+	}
+	if ok, err := store.ThreadBelongsToUser(r.Context(), infra.DB, threadID, userID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	} else if !ok {
+		http.Error(w, "thread forbidden", http.StatusForbidden)
 		return
 	}
 	limit := 100

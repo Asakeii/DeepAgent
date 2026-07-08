@@ -8,6 +8,7 @@ import (
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
 	"deepAgent/internal/scheduler"
+	"deepAgent/internal/store"
 )
 
 func ListReminders(w http.ResponseWriter, r *http.Request) {
@@ -22,6 +23,9 @@ func ListReminders(w http.ResponseWriter, r *http.Request) {
 	threadID := r.URL.Query().Get("thread_id")
 	if threadID == "" {
 		http.Error(w, "thread_id required", http.StatusBadRequest)
+		return
+	}
+	if !ensureThreadAccess(w, r, threadID) {
 		return
 	}
 
@@ -72,6 +76,9 @@ func CancelReminder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "thread_id and reminder_id required", http.StatusBadRequest)
 		return
 	}
+	if !ensureThreadAccess(w, r, req.ThreadID) {
+		return
+	}
 
 	if err := scheduler.Cancel(r.Context(), infra.RDB, req.ThreadID, req.ReminderID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -108,6 +115,9 @@ func ToggleReminder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "thread_id and reminder_id required", http.StatusBadRequest)
 		return
 	}
+	if !ensureThreadAccess(w, r, req.ThreadID) {
+		return
+	}
 
 	reminder, err := scheduler.SetActive(r.Context(), infra.RDB, req.ThreadID, req.ReminderID, req.Active)
 	if err != nil {
@@ -128,4 +138,18 @@ func ToggleReminder(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func ensureThreadAccess(w http.ResponseWriter, r *http.Request, threadID string) bool {
+	userID := requestUserID(r)
+	ok, err := store.ThreadBelongsToUser(r.Context(), infra.DB, threadID, userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return false
+	}
+	if !ok {
+		http.Error(w, "thread forbidden", http.StatusForbidden)
+		return false
+	}
+	return true
 }

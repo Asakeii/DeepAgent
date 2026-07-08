@@ -12,6 +12,15 @@ import (
 	"deepAgent/internal/scheduler"
 )
 
+func firstUserMessage(req model.ChatRequest) string {
+	for _, msg := range req.Messages {
+		if msg != nil && msg.Role == schema.User && strings.TrimSpace(msg.Content) != "" {
+			return strings.TrimSpace(msg.Content)
+		}
+	}
+	return ""
+}
+
 func writeInterrupt(writer EventWriter, threadID string) {
 	_ = writer.WriteEvent("interrupt", &model.ChatResp{
 		ThreadID:     threadID,

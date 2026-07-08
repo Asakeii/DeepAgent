@@ -23,5 +23,8 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 		_ = sse.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "invalid request body: " + err.Error()})
 		return
 	}
+	if req.UserID == "" {
+		req.UserID = requestUserID(r)
+	}
 	app.NewChatService().RunStream(ctx, req, sse)
 }

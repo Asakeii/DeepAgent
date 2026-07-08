@@ -8,6 +8,7 @@ import (
 	"github.com/cloudwego/eino/schema"
 
 	"deepAgent/internal/app"
+	"deepAgent/internal/store"
 )
 
 // OpenAICompatible 提供 /v1/chat/completions 端点。
@@ -27,6 +28,10 @@ func OpenAICompatible(w http.ResponseWriter, r *http.Request) {
 	if threadID == "" {
 		threadID = "weclaw-default"
 	}
+	userID := requestUserID(r)
+	if userID == store.AnonymousUserID {
+		userID = "openai:" + threadID
+	}
 
 	msgs := make([]*schema.Message, len(req.Messages))
 	for i, m := range req.Messages {
@@ -41,6 +46,7 @@ func OpenAICompatible(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := app.NewCheckinService().RunTurn(r.Context(), app.CheckinTurnRequest{
+		UserID:   userID,
 		ThreadID: threadID,
 		Messages: msgs,
 	})

@@ -68,10 +68,10 @@ func RecentMessages(ctx context.Context, db *sql.DB, threadID string, limit int)
 
 // ThreadInfo 会话摘要信息。
 type ThreadInfo struct {
-	ThreadID  string
-	FirstMsg  string // 第一条用户消息作为标题
-	LastAt    string // 最后消息时间
-	MsgCount  int
+	ThreadID string
+	FirstMsg string // 第一条用户消息作为标题
+	LastAt   string // 最后消息时间
+	MsgCount int
 }
 
 // ListThreads 返回所有 thread 的基本信息，按最近活动排序。
@@ -84,6 +84,33 @@ func ListThreads(ctx context.Context, db *sql.DB, limit int) ([]ThreadInfo, erro
 		 FROM messages m1 GROUP BY thread_id ORDER BY last_at DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list threads: %w", err)
+	}
+	defer rows.Close()
+	var out []ThreadInfo
+	for rows.Next() {
+		var t ThreadInfo
+		if err := rows.Scan(&t.ThreadID, &t.FirstMsg, &t.LastAt, &t.MsgCount); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+func ListThreadsForUser(ctx context.Context, db *sql.DB, userID string, limit int) ([]ThreadInfo, error) {
+	userID = NormalizeUserID(userID)
+	rows, err := db.QueryContext(ctx,
+		`SELECT t.id,
+		 COALESCE(NULLIF(t.title, ''), (SELECT content FROM messages m2 WHERE m2.thread_id=t.id AND role='user' ORDER BY turn_idx ASC LIMIT 1), '') AS first_msg,
+		 COALESCE(MAX(m.created_at), t.updated_at) AS last_at,
+		 COUNT(m.id) AS msg_count
+		 FROM threads t
+		 LEFT JOIN messages m ON m.thread_id=t.id
+		 WHERE t.user_id=?
+		 GROUP BY t.id, t.title, t.updated_at
+		 ORDER BY last_at DESC LIMIT ?`, userID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list user threads: %w", err)
 	}
 	defer rows.Close()
 	var out []ThreadInfo

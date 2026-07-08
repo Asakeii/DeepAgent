@@ -33,9 +33,20 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 	if req.ThreadID == "" {
 		req.ThreadID = req.RunID
 	}
+	req.UserID = store.NormalizeUserID(req.UserID)
 	mode := "chat"
 	if req.ImageBase64 != "" {
 		mode = "image"
+	}
+	if err := store.EnsureThread(ctx, infra.DB, req.ThreadID, req.UserID, firstUserMessage(req), mode); err != nil {
+		log.Printf("[thread] ensure thread=%s user=%s: %v", req.ThreadID, req.UserID, err)
+	}
+	if ok, err := store.ThreadBelongsToUser(ctx, infra.DB, req.ThreadID, req.UserID); err != nil {
+		_ = writer.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "thread ownership check failed: " + err.Error()})
+		return
+	} else if !ok {
+		_ = writer.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "thread forbidden"})
+		return
 	}
 	if err := store.CreateRun(ctx, infra.DB, store.RunRecord{
 		ID:       req.RunID,
@@ -77,6 +88,7 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 	}
 	if result.RouteToCheckin {
 		checkinResult, err := s.Checkin.RunTurn(ctx, CheckinTurnRequest{
+			UserID:   req.UserID,
 			ThreadID: req.ThreadID,
 			Messages: req.Messages,
 		})
