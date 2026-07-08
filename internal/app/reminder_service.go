@@ -32,6 +32,6 @@ func (s *ReminderService) AttachStream(ctx context.Context, threadID string, wri
 		}
 	}()
 	return func() {
-		scheduler.DefaultRegistry.Unregister(threadID)
+		scheduler.DefaultRegistry.Unregister(threadID, notifCh)
 	}
 }
