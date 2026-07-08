@@ -8,7 +8,6 @@ import (
 
 	"github.com/cloudwego/eino/schema"
 
-	"deepAgent/internal/agent"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
 	"deepAgent/internal/scheduler"
@@ -16,7 +15,14 @@ import (
 	"deepAgent/internal/toolruntime"
 )
 
-type CheckinService struct{}
+type CheckinAgentRunner interface {
+	RunCheckin(ctx context.Context, msgs []*schema.Message, threadID string) (*schema.Message, error)
+	AnalyzeFoodImage(ctx context.Context, imageB64, text, threadID string) (string, error)
+}
+
+type CheckinService struct {
+	Agent CheckinAgentRunner
+}
 
 type CheckinTurnRequest struct {
 	RunID    string
@@ -31,7 +37,14 @@ type CheckinTurnResult struct {
 }
 
 func NewCheckinService() *CheckinService {
-	return &CheckinService{}
+	return NewCheckinServiceWithRunner(defaultCheckinAgentRunner{})
+}
+
+func NewCheckinServiceWithRunner(runner CheckinAgentRunner) *CheckinService {
+	if runner == nil {
+		runner = defaultCheckinAgentRunner{}
+	}
+	return &CheckinService{Agent: runner}
 }
 
 func (s *CheckinService) RunTurn(ctx context.Context, req CheckinTurnRequest) (CheckinTurnResult, error) {
@@ -57,7 +70,7 @@ func (s *CheckinService) RunTurn(ctx context.Context, req CheckinTurnRequest) (C
 		UserID:   req.UserID,
 	})
 
-	resp, err := agent.RunCheckin(checkinCtx, req.Messages, req.ThreadID)
+	resp, err := s.Agent.RunCheckin(checkinCtx, req.Messages, req.ThreadID)
 	if err != nil {
 		return CheckinTurnResult{}, err
 	}
@@ -82,7 +95,7 @@ func (s *CheckinService) AnalyzeImage(ctx context.Context, req model.ChatRequest
 	if len(req.Messages) > 0 {
 		txt = req.Messages[len(req.Messages)-1].Content
 	}
-	return agent.AnalyzeFoodImage(ctx, req.ImageBase64, txt, req.ThreadID)
+	return s.Agent.AnalyzeFoodImage(ctx, req.ImageBase64, txt, req.ThreadID)
 }
 
 func (s *CheckinService) EmitResult(writer EventWriter, threadID string, result CheckinTurnResult) {

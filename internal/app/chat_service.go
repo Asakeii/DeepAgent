@@ -14,17 +14,26 @@ import (
 
 // ChatService orchestrates one chat turn while keeping transport handlers thin.
 type ChatService struct {
-	Research  *ResearchService
-	Checkin   *CheckinService
-	Reminders *ReminderService
+	Research  ResearchRunner
+	Checkin   CheckinRunner
+	Reminders ReminderStreamer
 }
 
 func NewChatService() *ChatService {
-	return &ChatService{
-		Research:  NewResearchService(),
-		Checkin:   NewCheckinService(),
-		Reminders: NewReminderService(),
+	return NewChatServiceWithDeps(NewResearchService(), NewCheckinService(), NewReminderService())
+}
+
+func NewChatServiceWithDeps(research ResearchRunner, checkin CheckinRunner, reminders ReminderStreamer) *ChatService {
+	if research == nil {
+		research = NewResearchService()
 	}
+	if checkin == nil {
+		checkin = NewCheckinService()
+	}
+	if reminders == nil {
+		reminders = NewReminderService()
+	}
+	return &ChatService{Research: research, Checkin: checkin, Reminders: reminders}
 }
 
 // RunStream preserves the existing /chat/stream event contract.
