@@ -191,6 +191,7 @@ func runServer() {
 	mux.HandleFunc("/api/messages", handler.LoadMessages)
 	mux.HandleFunc("/api/run-events", handler.ListRunEvents)
 	mux.HandleFunc("/api/tool-audits", handler.ListToolAudits)
+	mux.HandleFunc("/api/metrics/runs", handler.RunMetrics)
 	mux.HandleFunc("/api/reminders", handler.ListReminders)
 	mux.HandleFunc("/api/reminders/cancel", handler.CancelReminder)
 	mux.HandleFunc("/api/reminders/toggle", handler.ToggleReminder)
