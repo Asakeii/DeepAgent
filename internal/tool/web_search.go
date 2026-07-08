@@ -61,9 +61,10 @@ type webSearchInput struct {
 }
 
 type webSearchResult struct {
-	Title   string `json:"title"`
-	URL     string `json:"url"`
-	Snippet string `json:"snippet"`
+	Title        string `json:"title"`
+	URL          string `json:"url"`
+	Snippet      string `json:"snippet"`
+	SecurityNote string `json:"security_note,omitempty"`
 }
 
 type webSearchOutput struct {
@@ -121,9 +122,10 @@ func searchWeb(ctx context.Context, in webSearchInput) (webSearchOutput, error) 
 			snippet = snippet[:300] + "..."
 		}
 		out.Results = append(out.Results, webSearchResult{
-			Title:   r.Title,
-			URL:     r.URL,
-			Snippet: snippet,
+			Title:        r.Title,
+			URL:          r.URL,
+			Snippet:      snippet,
+			SecurityNote: security.ExternalContentSecurityNote(snippet),
 		})
 	}
 
@@ -143,8 +145,9 @@ type webFetchInput struct {
 }
 
 type webFetchOutput struct {
-	URL     string `json:"url"`
-	Content string `json:"content"`
+	URL          string `json:"url"`
+	Content      string `json:"content"`
+	SecurityNote string `json:"security_note,omitempty"`
 }
 
 func fetchPage(ctx context.Context, in webFetchInput) (webFetchOutput, error) {
@@ -185,7 +188,11 @@ func fetchPage(ctx context.Context, in webFetchInput) (webFetchOutput, error) {
 		text = text[:6000] + "...[truncated]"
 	}
 
-	return webFetchOutput{URL: in.URL, Content: text}, nil
+	return webFetchOutput{
+		URL:          in.URL,
+		Content:      security.WrapUntrustedExternalContent(in.URL, text),
+		SecurityNote: security.ExternalContentSecurityNote(text),
+	}, nil
 }
 
 // ---------------------------------------------------------------------------

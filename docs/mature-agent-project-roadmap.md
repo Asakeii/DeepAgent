@@ -501,7 +501,7 @@ AppendMessage:
 - [ ] reminder multi-connection。
 - [ ] run cancellation。
 - [ ] tool risk policy。
-- [ ] prompt injection 防护。
+- [x] prompt injection 防护。
 - [ ] 用户设置。
 - [ ] 前端 session search。
 

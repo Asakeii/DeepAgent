@@ -1,0 +1,6 @@
+- [x] 新增 prompt injection detector。
+- [x] `web_fetch` 输出标记不可信外部来源。
+- [x] `web_search` 疑似注入片段输出 `security_note`。
+- [x] researcher prompt 增加外部内容安全边界。
+- [x] 补充 detector 单元测试。
+- [ ] 后续：基于 eval 数据集衡量误报/漏报。
