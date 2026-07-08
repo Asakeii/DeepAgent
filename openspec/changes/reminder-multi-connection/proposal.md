@@ -14,5 +14,5 @@
 ## 方案反思
 
 - 这解决的是单 pod 内多 SSE 连接问题。
-- 多 pod 跨实例实时广播仍需要 Redis Pub/Sub、Redis Streams 或专门的 event gateway。
+- 多 pod 跨实例实时广播已由后续 `reminder-pubsub-delivery` 使用 Redis Pub/Sub 继续推进。
 - 现有 Redis pending 机制仍保留，用于离线或当前 pod 无连接时的兜底投递。

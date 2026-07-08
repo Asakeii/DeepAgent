@@ -18,6 +18,8 @@ const (
 	hashPrefix    = "reminder:" // reminder:{id}
 	threadPrefix  = "reminders:thread:"
 	lockKey       = "reminders:lock"
+	pubsubChannel = "reminders:events"
+	pendingPrefix = "pending:"
 )
 
 // Reminder is the in-memory / on-wire representation of a reminder.
@@ -240,6 +242,7 @@ func Start(ctx context.Context, rdb *redis.Client, reg *ConnRegistry) *Worker {
 
 func (w *Worker) Start(ctx context.Context) {
 	go w.loop(ctx)
+	go w.listenBroadcast(ctx)
 }
 
 func (w *Worker) Stop() {
@@ -328,18 +331,51 @@ func (w *Worker) deliver(ctx context.Context, r Reminder) {
 	log.Printf("[scheduler] FIRE | thread=%s | %s", r.ThreadID, r.Message)
 
 	event := eventFromReminder(r, "fired")
-	if !w.registry.Push(r.ThreadID, event) {
-		// User offline: store pending so it's delivered on next connect
-		data, _ := json.Marshal(event)
-		w.rdb.LPush(ctx, "pending:"+r.ThreadID, string(data))
-		w.rdb.Expire(ctx, "pending:"+r.ThreadID, 24*time.Hour)
-		log.Printf("[scheduler] OFFLINE | thread=%s | queued pending", r.ThreadID)
+	data, err := pendingPayload(event)
+	if err != nil {
+		log.Printf("[scheduler] encode event: %v", err)
+		return
+	}
+	if err := enqueuePending(ctx, w.rdb, event, data); err != nil {
+		log.Printf("[scheduler] pending enqueue thread=%s: %v", r.ThreadID, err)
+	}
+	if err := w.rdb.Publish(ctx, pubsubChannel, data).Err(); err != nil {
+		log.Printf("[scheduler] publish thread=%s: %v", r.ThreadID, err)
+	}
+}
+
+func (w *Worker) listenBroadcast(ctx context.Context) {
+	sub := w.rdb.Subscribe(ctx, pubsubChannel)
+	defer sub.Close()
+
+	ch := sub.Channel()
+	for {
+		select {
+		case msg, ok := <-ch:
+			if !ok {
+				return
+			}
+			var event ReminderEvent
+			if err := json.Unmarshal([]byte(msg.Payload), &event); err != nil {
+				log.Printf("[scheduler] pubsub decode: %v", err)
+				continue
+			}
+			if w.registry.Push(event.ThreadID, event) {
+				if err := ackPending(ctx, w.rdb, event, msg.Payload); err != nil {
+					log.Printf("[scheduler] pending ack thread=%s: %v", event.ThreadID, err)
+				}
+			}
+		case <-w.stopCh:
+			return
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
 // DrainPending delivers any pending notifications for a newly connected thread.
 func DrainPending(ctx context.Context, rdb *redis.Client, threadID string, ch chan ReminderEvent) {
-	key := "pending:" + threadID
+	key := pendingPrefix + threadID
 	for {
 		msg, err := rdb.RPop(ctx, key).Result()
 		if err != nil {
@@ -359,4 +395,25 @@ func DrainPending(ctx context.Context, rdb *redis.Client, threadID string, ch ch
 		default:
 		}
 	}
+}
+
+func pendingPayload(event ReminderEvent) (string, error) {
+	data, err := json.Marshal(event)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func enqueuePending(ctx context.Context, rdb *redis.Client, event ReminderEvent, payload string) error {
+	key := pendingPrefix + event.ThreadID
+	pipe := rdb.Pipeline()
+	pipe.LPush(ctx, key, payload)
+	pipe.Expire(ctx, key, 24*time.Hour)
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+func ackPending(ctx context.Context, rdb *redis.Client, event ReminderEvent, payload string) error {
+	return rdb.LRem(ctx, pendingPrefix+event.ThreadID, 1, payload).Err()
 }
