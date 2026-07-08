@@ -59,6 +59,7 @@ func (s *CheckinService) EmitResult(writer EventWriter, threadID string, result 
 	for _, event := range result.ReminderEvents {
 		_ = writer.WriteEvent("reminder_scheduled", &model.ChatResp{
 			ThreadID: threadID,
+			Agent:    "checkin",
 			Role:     "assistant",
 			Content:  event.Message,
 			Reminder: reminderResp(event),
@@ -68,5 +69,5 @@ func (s *CheckinService) EmitResult(writer EventWriter, threadID string, result 
 	if result.Response != nil {
 		content = result.Response.Content
 	}
-	_ = writer.WriteEvent("message", &model.ChatResp{Role: "assistant", Content: content})
+	_ = writer.WriteEvent("message", &model.ChatResp{Agent: "checkin", Role: "assistant", Content: content})
 }

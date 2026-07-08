@@ -7,6 +7,8 @@ import "github.com/cloudwego/eino/schema"
 type ChatRequest struct {
 	Messages                      []*schema.Message `json:"messages,omitempty"`
 	Debug                         bool              `json:"debug,omitempty"`
+	UserID                        string            `json:"user_id,omitempty"`
+	RunID                         string            `json:"run_id,omitempty"`
 	ThreadID                      string            `json:"thread_id,omitempty"`
 	MaxPlanIterations             int               `json:"max_plan_iterations,omitempty"`
 	MaxStepNum                    int               `json:"max_step_num,omitempty"`
@@ -64,8 +66,23 @@ type ListRemindersResponse struct {
 	Reminders []*ReminderResp `json:"reminders"`
 }
 
+type RunEventResp struct {
+	ID        int64  `json:"id"`
+	RunID     string `json:"run_id"`
+	ThreadID  string `json:"thread_id"`
+	UserID    string `json:"user_id,omitempty"`
+	EventName string `json:"event_name"`
+	Agent     string `json:"agent,omitempty"`
+	Payload   any    `json:"payload"`
+}
+
+type ListRunEventsResponse struct {
+	Events []*RunEventResp `json:"events"`
+}
+
 // ChatResp 是 SSE 事件里返回给前端的统一消息结构。
 type ChatResp struct {
+	RunID          string           `json:"run_id,omitempty"`
 	ThreadID       string           `json:"thread_id,omitempty"`
 	Agent          string           `json:"agent,omitempty"`
 	ID             string           `json:"id,omitempty"`

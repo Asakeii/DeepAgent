@@ -182,6 +182,7 @@ func runServer() {
 	// 前端静态文件
 	mux.HandleFunc("/api/sessions", handler.ListSessions)
 	mux.HandleFunc("/api/messages", handler.LoadMessages)
+	mux.HandleFunc("/api/run-events", handler.ListRunEvents)
 	mux.HandleFunc("/api/reminders", handler.ListReminders)
 	mux.HandleFunc("/api/reminders/cancel", handler.CancelReminder)
 	mux.HandleFunc("/api/reminders/toggle", handler.ToggleReminder)

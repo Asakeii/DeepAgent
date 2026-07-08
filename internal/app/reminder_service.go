@@ -24,6 +24,7 @@ func (s *ReminderService) AttachStream(ctx context.Context, threadID string, wri
 		for event := range notifCh {
 			_ = writer.WriteEvent("reminder", &model.ChatResp{
 				ThreadID: threadID,
+				Agent:    "reminder",
 				Role:     "assistant",
 				Content:  "提醒：" + event.Message,
 				Reminder: reminderResp(event),

@@ -2,8 +2,11 @@ package app
 
 import (
 	"context"
+	"log"
 
+	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
+	"deepAgent/internal/store"
 )
 
 // ChatService orchestrates one chat turn while keeping transport handlers thin.
@@ -24,21 +27,51 @@ func NewChatService() *ChatService {
 // RunStream preserves the existing /chat/stream event contract.
 func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writer EventWriter) {
 	req.InterruptFeedback = NormalizeInterruptFeedback(req.InterruptFeedback)
+	if req.RunID == "" {
+		req.RunID = newRunID()
+	}
+	if req.ThreadID == "" {
+		req.ThreadID = req.RunID
+	}
+	mode := "chat"
+	if req.ImageBase64 != "" {
+		mode = "image"
+	}
+	if err := store.CreateRun(ctx, infra.DB, store.RunRecord{
+		ID:       req.RunID,
+		UserID:   req.UserID,
+		ThreadID: req.ThreadID,
+		Mode:     mode,
+	}); err != nil {
+		log.Printf("[run] create run=%s thread=%s: %v", req.RunID, req.ThreadID, err)
+	}
+	runWriter := NewRunEventWriter(infra.DB, req.RunID, req.ThreadID, req.UserID, writer)
+	defer func() {
+		status := store.RunStatusSucceeded
+		errText := ""
+		if failed, captured := runWriter.Failed(); failed {
+			status = store.RunStatusFailed
+			errText = captured
+		}
+		if err := store.CompleteRun(context.Background(), infra.DB, req.RunID, status, errText); err != nil {
+			log.Printf("[run] complete run=%s status=%s: %v", req.RunID, status, err)
+		}
+	}()
 
-	detach := s.Reminders.AttachStream(ctx, req.ThreadID, writer)
+	detach := s.Reminders.AttachStream(ctx, req.ThreadID, runWriter)
 	defer detach()
 
 	if req.ImageBase64 != "" {
 		resp, err := s.Checkin.AnalyzeImage(ctx, req)
 		if err != nil {
-			_ = writer.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "分析失败: " + err.Error()})
+			_ = runWriter.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "分析失败: " + err.Error()})
 			return
 		}
-		_ = writer.WriteEvent("message", &model.ChatResp{Role: "assistant", Content: resp})
+		_ = runWriter.WriteEvent("message", &model.ChatResp{Role: "assistant", Content: resp})
 		return
 	}
 
-	result, err := s.Research.Run(ctx, req, writer)
+	result, err := s.Research.Run(ctx, req, runWriter)
 	if err != nil {
 		return
 	}
@@ -50,7 +83,7 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 		if err != nil {
 			return
 		}
-		s.Checkin.EmitResult(writer, req.ThreadID, checkinResult)
+		s.Checkin.EmitResult(runWriter, req.ThreadID, checkinResult)
 		return
 	}
 	persistResearchMessages(ctx, req.ThreadID, req.Messages, result.Final)
