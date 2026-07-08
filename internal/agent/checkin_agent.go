@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/flow/agent/react"
@@ -65,6 +66,9 @@ func RunCheckin(ctx context.Context, msgs []*schema.Message, threadID string) (*
 	history, _ := infra.RecentMessagesForCheckin(ctx, threadID, 20)
 	prompt := append(history, msgs...)
 	for _, m := range msgs {
+		if m == nil || m.Role != schema.User || strings.TrimSpace(m.Content) == "" {
+			continue
+		}
 		_ = infra.AppendMessageForCheckin(ctx, threadID, string(m.Role), m.Content)
 	}
 

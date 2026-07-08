@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 
+	"github.com/cloudwego/eino/schema"
+
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
 	"deepAgent/internal/store"
@@ -50,6 +52,13 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 		return
 	}
 	persistExplicitMemories(ctx, req.UserID, req.ThreadID, req.Messages)
+	originalMessages := append([]*schema.Message(nil), req.Messages...)
+	agentMessages, err := messagesWithUserMemories(ctx, req.UserID, req.Messages)
+	if err != nil {
+		log.Printf("[memory] inject user=%s thread=%s: %v", req.UserID, req.ThreadID, err)
+	} else {
+		req.Messages = agentMessages
+	}
 	if err := store.CreateRun(ctx, infra.DB, store.RunRecord{
 		ID:       req.RunID,
 		UserID:   req.UserID,
@@ -106,7 +115,7 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 		s.Checkin.EmitResult(runWriter, req.ThreadID, checkinResult)
 		return
 	}
-	persistResearchMessages(ctx, req.ThreadID, req.Messages, result.Final)
+	persistResearchMessages(ctx, req.ThreadID, originalMessages, result.Final)
 }
 
 func (s *ChatService) RunToText(ctx context.Context, req model.ChatRequest) string {
