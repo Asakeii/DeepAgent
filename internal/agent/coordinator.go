@@ -70,9 +70,6 @@ func routeCoordinatorResult(ctx context.Context, state *model.State, input *sche
 		// 打卡任务不进研究图：sigal handler 层切到 checkin agent
 		state.RouteToCheckin = true
 		state.Goto = compose.END
-		if state.ThreadID != "" {
-			CheckinThreads.Store(state.ThreadID, true)
-		}
 	}
 
 	return nil

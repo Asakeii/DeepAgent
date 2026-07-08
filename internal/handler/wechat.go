@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"crypto/sha1"
 	"encoding/xml"
 	"fmt"
@@ -13,12 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
-	"deepAgent/internal/agent"
-	"deepAgent/internal/consts"
-	"deepAgent/internal/infra"
+	"deepAgent/internal/app"
 	"deepAgent/internal/model"
 )
 
@@ -124,69 +120,12 @@ func handleWechatMessage(w http.ResponseWriter, r *http.Request) {
 		userMsg = fmt.Sprintf("打卡早餐 %s", msg.PicURL)
 	}
 
-	initMsg := userMsg
-	initThreadID := threadID
-
-	genFunc := func(ctx context.Context) *model.State {
-		return &model.State{
-			Messages:                      []*schema.Message{schema.UserMessage(initMsg)},
-			Goto:                          consts.Coordinator,
-			Locale:                        "zh-CN",
-			AutoAcceptedPlan:              true,
-			ThreadID:                      initThreadID,
-			EnableBackgroundInvestigation: false,
-		}
-	}
-	runnable, err := agent.Builder(r.Context(), genFunc)
-	if err != nil {
-		log.Printf("[wechat] build graph: %v", err)
-		writeWechatReply(w, msg, "系统繁忙，请稍后再试")
-		return
-	}
-
-	// collect stream output
-	var sb strings.Builder
-	outChan := make(chan string)
-	done := make(chan struct{})
-
-	go func() {
-		for s := range outChan {
-			sb.WriteString(s)
-		}
-		close(done)
-	}()
-
-	_, err = runnable.Stream(r.Context(), consts.Coordinator,
-		compose.WithCallbacks(&infra.LoggerCallback{
-			ID:  threadID,
-			Out: outChan,
-		}),
-	)
-	close(outChan)
-	<-done
-
-	if err != nil {
-		log.Printf("[wechat] graph error: %v", err)
-		if sb.Len() > 0 {
-			writeWechatReply(w, msg, sb.String())
-		} else {
-			writeWechatReply(w, msg, "处理出错，请稍后再试")
-		}
-		return
-	}
-
-	// Coordinator 标记打卡路由时，切到 checkin agent
-	if _, ok := agent.CheckinThreads.LoadAndDelete(initThreadID); ok {
-		resp, cerr := agent.RunCheckin(context.Background(), []*schema.Message{schema.UserMessage(initMsg)}, initThreadID)
-		if cerr == nil {
-			writeWechatReply(w, msg, resp.Content)
-		} else {
-			writeWechatReply(w, msg, "处理出错，请稍后再试")
-		}
-		return
-	}
-
-	replyContent := strings.TrimSpace(sb.String())
+	replyContent := strings.TrimSpace(app.NewChatService().RunToText(r.Context(), model.ChatRequest{
+		Messages:                      []*schema.Message{schema.UserMessage(userMsg)},
+		ThreadID:                      threadID,
+		AutoAcceptedPlan:              true,
+		EnableBackgroundInvestigation: boolPtr(false),
+	}))
 	if replyContent == "" {
 		replyContent = "已收到"
 	}
@@ -211,4 +150,8 @@ func writeWechatReply(w http.ResponseWriter, msg wechatMsg, content string) {
 
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
 	w.Write(replyXML)
+}
+
+func boolPtr(v bool) *bool {
+	return &v
 }

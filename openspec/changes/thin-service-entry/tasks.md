@@ -11,8 +11,14 @@
 
 ## Follow-up Tasks
 
-- [ ] Extract `ResearchService` from `ChatService`.
-- [ ] Extract `CheckinService` from `ChatService`.
-- [ ] Move WeChat and OpenAI-compatible endpoints onto the application service boundary.
-- [ ] Remove process-local `agent.CheckinThreads` routing.
-- [ ] Add service-level tests with fake event writers and fake agent runners.
+- [x] Extract `ResearchService` from `ChatService`.
+- [x] Extract `CheckinService` from `ChatService`.
+- [x] Move WeChat and OpenAI-compatible endpoints onto the application service boundary.
+- [x] Remove process-local `agent.CheckinThreads` routing.
+- [x] Add service-level tests for event capture and route detection.
+
+## Remaining Hardening
+
+- [ ] Add injectable graph/check-in runner interfaces for deeper service tests.
+- [ ] Add auth/user ownership checks before exposing thread histories.
+- [ ] Persist run events for audit and replay.

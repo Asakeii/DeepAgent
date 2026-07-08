@@ -1,14 +1,13 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
 
 	"github.com/cloudwego/eino/schema"
 
-	"deepAgent/internal/agent"
+	"deepAgent/internal/app"
 )
 
 // OpenAICompatible 提供 /v1/chat/completions 端点。
@@ -41,12 +40,19 @@ func OpenAICompatible(w http.ResponseWriter, r *http.Request) {
 		msgs[i] = &schema.Message{Role: role, Content: m.Content}
 	}
 
-	resp, err := agent.RunCheckin(context.Background(), msgs, threadID)
+	resp, err := app.NewCheckinService().RunTurn(r.Context(), app.CheckinTurnRequest{
+		ThreadID: threadID,
+		Messages: msgs,
+	})
 	if err != nil {
 		writeOpenAICompletions(w, err.Error())
 		return
 	}
-	writeOpenAICompletions(w, resp.Content)
+	content := ""
+	if resp.Response != nil {
+		content = resp.Response.Content
+	}
+	writeOpenAICompletions(w, content)
 }
 
 // ---- OpenAI-compatible types ----

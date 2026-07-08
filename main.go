@@ -9,12 +9,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
 	"deepAgent/conf"
 	"deepAgent/internal/agent"
-	"deepAgent/internal/consts"
+	"deepAgent/internal/app"
 	"deepAgent/internal/handler"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
@@ -70,53 +69,47 @@ func runCLI(cfg *conf.Config) {
 	msg := schema.UserMessage(userPrompt)
 	threadID := os.Getenv("DEEPAGENT_THREAD_ID")
 
-	genFunc := func(ctx context.Context) *model.State {
-		return &model.State{
-			Messages:                      []*schema.Message{msg},
-			Goto:                          consts.Coordinator,
-			Locale:                        "zh-CN",
-			MaxPlanIterations:             cfg.Setting.MaxPlanIterations,
-			MaxStepNum:                    cfg.Setting.MaxStepNum,
-			AutoAcceptedPlan:              true,
-			EnableBackgroundInvestigation: cfg.Setting.EnableBackgroundInvestigation,
-			ThreadID:                      threadID,
-		}
-	}
-	r, errBuilder := agent.Builder(context.Background(), genFunc)
-	if errBuilder != nil {
-		log.Fatal(errBuilder)
-	}
-
-	outChan := make(chan string)
-	go func() {
-		for out := range outChan {
-			fmt.Print(out)
-		}
-	}()
-
-	var err error
-	_, err = r.Stream(context.Background(), consts.Coordinator,
-		compose.WithCallbacks(&infra.LoggerCallback{
-			ID:  "console",
-			Out: outChan,
-		}),
-	)
-	close(outChan)
-	if err != nil {
-		log.Fatal(err)
-	}
-	// Coordinator 标记打卡路由时，切到 checkin agent
-	if _, ok := agent.CheckinThreads.LoadAndDelete(threadID); ok {
-		resp, cerr := agent.RunCheckin(context.Background(), []*schema.Message{msg}, threadID)
-		if cerr != nil {
-			log.Printf("[checkin] %v", cerr)
-		} else {
-			fmt.Println()
-			fmt.Println(resp.Content)
-		}
-		return
-	}
+	app.NewChatService().RunStream(context.Background(), model.ChatRequest{
+		Messages:                      []*schema.Message{msg},
+		ThreadID:                      threadID,
+		MaxPlanIterations:             cfg.Setting.MaxPlanIterations,
+		MaxStepNum:                    cfg.Setting.MaxStepNum,
+		AutoAcceptedPlan:              true,
+		EnableBackgroundInvestigation: &cfg.Setting.EnableBackgroundInvestigation,
+	}, consoleEventWriter{})
 	fmt.Println()
+}
+
+type consoleEventWriter struct{}
+
+func (consoleEventWriter) WriteEvent(event string, payload any) error {
+	resp, ok := payload.(*model.ChatResp)
+	if !ok || resp == nil {
+		return nil
+	}
+	switch event {
+	case "message_chunk":
+		fmt.Print(resp.Content)
+	case "final_message", "message":
+		if resp.Content != "" {
+			fmt.Print(resp.Content)
+		}
+	case "reminder_scheduled":
+		if resp.Content != "" {
+			fmt.Printf("\n%s", resp.Content)
+		}
+	case "reminder":
+		if resp.Content != "" {
+			fmt.Printf("\n%s", resp.Content)
+		}
+	case "error":
+		if resp.Content != "" {
+			fmt.Printf("\n%s", resp.Content)
+		}
+	case "interrupt":
+		fmt.Print("\n检查计划")
+	}
+	return nil
 }
 
 // runCheckin 保留作为独立调试入口（不与 Coordinator 图耦合）。

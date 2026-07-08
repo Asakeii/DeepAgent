@@ -243,8 +243,8 @@ func (cb *LoggerCallback) pushToolCall(ctx context.Context, data *model.ChatResp
 
 func (cb *LoggerCallback) OnStart(ctx context.Context, info *callbacks.RunInfo, input callbacks.CallbackInput) context.Context {
 	// 不再往 Out 写裸文本节点标记，改为推送 SSE agent 事件供前端展示状态卡片
-	if inputStr, ok := input.(string); ok && inputStr != "" && cb.SSE != nil {
-		_ = cb.SSE.WriteEvent("agent", &model.ChatResp{
+	if inputStr, ok := input.(string); ok && inputStr != "" {
+		_ = cb.push(ctx, "agent", &model.ChatResp{
 			ThreadID: cb.ID,
 			Agent:    inputStr,
 		})
@@ -257,13 +257,11 @@ func (cb *LoggerCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo, ou
 }
 
 func (cb *LoggerCallback) OnError(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
-	if cb.SSE != nil {
-		_ = cb.SSE.WriteEvent("error", &model.ChatResp{
-			ThreadID: cb.ID,
-			Role:     "assistant",
-			Content:  err.Error(),
-		})
-	}
+	_ = cb.push(ctx, "error", &model.ChatResp{
+		ThreadID: cb.ID,
+		Role:     "assistant",
+		Content:  err.Error(),
+	})
 	return ctx
 }
 
