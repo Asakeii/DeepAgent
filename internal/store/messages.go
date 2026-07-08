@@ -4,37 +4,77 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/cloudwego/eino/schema"
 )
 
-// AppendMessage 追加一条消息到 messages 表。turn_idx 自增。
-func AppendMessage(ctx context.Context, db *sql.DB, threadID, role, content string) error {
-	idx, err := NextTurnIdx(ctx, db, threadID)
+func EnsureMessageTables(ctx context.Context, db *sql.DB) error {
+	if db == nil {
+		return fmt.Errorf("db is nil")
+	}
+	_, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS messages (
+		id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+		thread_id   VARCHAR(128) NOT NULL,
+		turn_idx    BIGINT NOT NULL,
+		role        VARCHAR(32) NOT NULL,
+		content     MEDIUMTEXT NOT NULL,
+		created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		KEY idx_thread_turn (thread_id, turn_idx)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
+	if err != nil {
+		return fmt.Errorf("ensure messages table: %w", err)
+	}
+	needsAlter, err := messageTurnIdxNeedsAlter(ctx, db)
 	if err != nil {
 		return err
 	}
-	_, err = db.ExecContext(ctx,
-		`INSERT INTO messages (thread_id, turn_idx, role, content) VALUES (?, ?, ?, ?)`,
-		threadID, idx, role, content)
-	if err != nil {
-		return fmt.Errorf("append message: %w", err)
+	if needsAlter {
+		if _, err := db.ExecContext(ctx, `ALTER TABLE messages MODIFY turn_idx BIGINT NOT NULL`); err != nil {
+			return fmt.Errorf("ensure messages turn_idx: %w", err)
+		}
 	}
 	return nil
 }
 
-// NextTurnIdx 返回该 thread 的下一个 turn 序号（当前最大+1，空表返回0）。
-func NextTurnIdx(ctx context.Context, db *sql.DB, threadID string) (int, error) {
-	var maxIdx sql.NullInt64
-	err := db.QueryRowContext(ctx,
-		`SELECT MAX(turn_idx) FROM messages WHERE thread_id = ?`, threadID).Scan(&maxIdx)
+func messageTurnIdxNeedsAlter(ctx context.Context, db *sql.DB) (bool, error) {
+	var dataType string
+	err := db.QueryRowContext(ctx, `SELECT DATA_TYPE
+		FROM INFORMATION_SCHEMA.COLUMNS
+		WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='messages' AND COLUMN_NAME='turn_idx'`).Scan(&dataType)
 	if err != nil {
-		return 0, fmt.Errorf("query max turn_idx: %w", err)
+		return false, fmt.Errorf("inspect messages turn_idx: %w", err)
 	}
-	if !maxIdx.Valid {
-		return 0, nil
+	return strings.ToLower(dataType) != "bigint", nil
+}
+
+// AppendMessage 追加一条消息到 messages 表。
+// turn_idx 使用该行自增 id，避免多 pod 并发写同一 thread 时出现 MAX(turn_idx)+1 竞争。
+func AppendMessage(ctx context.Context, db *sql.DB, threadID, role, content string) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin append message: %w", err)
 	}
-	return int(maxIdx.Int64) + 1, nil
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx,
+		`INSERT INTO messages (thread_id, turn_idx, role, content) VALUES (?, 0, ?, ?)`,
+		threadID, role, content)
+	if err != nil {
+		return fmt.Errorf("append message: %w", err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("message insert id: %w", err)
+	}
+	_, err = tx.ExecContext(ctx, `UPDATE messages SET turn_idx=? WHERE id=?`, id, id)
+	if err != nil {
+		return fmt.Errorf("set message turn_idx: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit append message: %w", err)
+	}
+	return nil
 }
 
 // RecentMessages 取该 thread 最近 limit 条消息（按 turn_idx 升序），转为 schema.Message。

@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS threads (
 CREATE TABLE IF NOT EXISTS messages (
     id          BIGINT AUTO_INCREMENT PRIMARY KEY,
     thread_id   VARCHAR(128) NOT NULL,
-    turn_idx    INT NOT NULL,
+    turn_idx    BIGINT NOT NULL,
     role        VARCHAR(32) NOT NULL,
     content     MEDIUMTEXT NOT NULL,
     created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

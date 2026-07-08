@@ -35,6 +35,9 @@ func InitDB(ctx context.Context) error {
 	if err := store.EnsureIdentityTables(ctx, db); err != nil {
 		return err
 	}
+	if err := store.EnsureMessageTables(ctx, db); err != nil {
+		return err
+	}
 	if err := store.EnsureRunTables(ctx, db); err != nil {
 		return err
 	}
