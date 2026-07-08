@@ -5,6 +5,6 @@
 - [x] 将 HTTP middleware 从 `Access-Control-Allow-Origin: *` 改为白名单校验。
 - [x] 增加统一请求体大小限制。
 - [x] 补充配置解析和 HTTP middleware 单元测试。
-- [ ] 后续：API auth / API key。
-- [ ] 后续：rate limit。
+- [x] API auth / API key 已由 `api-auth-rate-limit` 补齐。
+- [x] rate limit 已由 `api-auth-rate-limit` 补齐。
 - [ ] 后续：按路由配置 body limit。

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"deepAgent/conf"
+	"deepAgent/internal/infra"
 )
 
 func TestHTTPGuardsAllowConfiguredOrigin(t *testing.T) {
@@ -67,6 +68,84 @@ func TestHTTPGuardsLimitRequestBody(t *testing.T) {
 
 	if rec.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("status=%d, want %d", rec.Code, http.StatusRequestEntityTooLarge)
+	}
+}
+
+func TestHTTPGuardsRequireAPIKeyForProtectedRoutes(t *testing.T) {
+	withTestServerConfig(t, conf.ServerConfig{
+		AllowedOrigins: []string{"https://app.example.com"},
+		MaxBodyBytes:   1024,
+		APIKeys:        []string{"secret"},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions", nil)
+	rec := httptest.NewRecorder()
+
+	withHTTPGuards(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("handler should not be called")
+	})).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status=%d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestHTTPGuardsAllowBearerAPIKey(t *testing.T) {
+	withTestServerConfig(t, conf.ServerConfig{
+		AllowedOrigins: []string{"https://app.example.com"},
+		MaxBodyBytes:   1024,
+		APIKeys:        []string{"secret"},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions", nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	rec := httptest.NewRecorder()
+
+	withHTTPGuards(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestHTTPGuardsDoNotProtectStaticRoutes(t *testing.T) {
+	withTestServerConfig(t, conf.ServerConfig{
+		AllowedOrigins: []string{"https://app.example.com"},
+		MaxBodyBytes:   1024,
+		APIKeys:        []string{"secret"},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+
+	withHTTPGuards(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestHTTPGuardsAllowWhenRateLimitConfiguredWithoutRedis(t *testing.T) {
+	prevRDB := infra.RDB
+	infra.RDB = nil
+	t.Cleanup(func() {
+		infra.RDB = prevRDB
+	})
+	withTestServerConfig(t, conf.ServerConfig{
+		AllowedOrigins:     []string{"https://app.example.com"},
+		MaxBodyBytes:       1024,
+		RateLimitPerMinute: 1,
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/sessions", nil)
+	rec := httptest.NewRecorder()
+
+	withHTTPGuards(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d, want %d", rec.Code, http.StatusOK)
 	}
 }
 

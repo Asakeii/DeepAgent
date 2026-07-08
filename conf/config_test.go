@@ -24,6 +24,8 @@ setting:
 server:
   allowed_origins: ["https://app.example.com"]
   max_body_bytes: 2048
+  api_keys: ["test-key"]
+  rate_limit_per_minute: 60
 `)
 	if err := os.MkdirAll(filepath.Join(dir, "conf"), 0755); err != nil {
 		t.Fatal(err)
@@ -47,6 +49,9 @@ server:
 	}
 	if cfg.Server.MaxBodyBytes != 2048 || len(cfg.Server.AllowedOrigins) != 1 || cfg.Server.AllowedOrigins[0] != "https://app.example.com" {
 		t.Fatalf("server config not parsed: %+v", cfg.Server)
+	}
+	if len(cfg.Server.APIKeys) != 1 || cfg.Server.APIKeys[0] != "test-key" || cfg.Server.RateLimitPerMinute != 60 {
+		t.Fatalf("server security config not parsed: %+v", cfg.Server)
 	}
 }
 

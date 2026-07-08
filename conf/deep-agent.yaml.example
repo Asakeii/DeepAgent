@@ -40,3 +40,11 @@ setting:
 database:
   dsn: "root:deepagent@tcp(mysql:3306)/deepagent?parseTime=true"
 
+server:
+  allowed_origins: ["http://localhost:5173", "http://127.0.0.1:5173"]
+  max_body_bytes: 1048576
+  # Empty api_keys disables API-key auth for local development.
+  # Configure one or more keys in production and pass Authorization: Bearer <key>.
+  api_keys: []
+  # Requires Redis to be initialized; 0 disables rate limiting.
+  rate_limit_per_minute: 60

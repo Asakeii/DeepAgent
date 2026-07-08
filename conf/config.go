@@ -57,8 +57,10 @@ type SettingConfig struct {
 }
 
 type ServerConfig struct {
-	AllowedOrigins []string `yaml:"allowed_origins"`
-	MaxBodyBytes   int64    `yaml:"max_body_bytes"`
+	AllowedOrigins     []string `yaml:"allowed_origins"`
+	MaxBodyBytes       int64    `yaml:"max_body_bytes"`
+	APIKeys            []string `yaml:"api_keys"`
+	RateLimitPerMinute int      `yaml:"rate_limit_per_minute"`
 }
 
 var App *Config // 全局配置变量，保存加载后的配置

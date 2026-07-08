@@ -3,11 +3,16 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/cloudwego/eino/schema"
 
@@ -208,6 +213,13 @@ func withHTTPGuards(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
+		if requiresAPIProtection(r.URL.Path) && !authorizeAPIRequest(r) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if requiresAPIProtection(r.URL.Path) && !allowByRateLimit(w, r) {
+			return
+		}
 		if limit := conf.App.Server.MaxBodyBytes; limit > 0 && r.Body != nil {
 			r.Body = http.MaxBytesReader(w, r.Body, limit)
 		}
@@ -224,12 +236,94 @@ func applyCORS(w http.ResponseWriter, r *http.Request) bool {
 		if origin == allowed {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-DeepAgent-User, X-DeepAgent-Run")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-DeepAgent-API-Key, X-DeepAgent-User, X-DeepAgent-Run")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 			return true
 		}
 	}
 	return false
+}
+
+func requiresAPIProtection(path string) bool {
+	return path == "/chat/stream" ||
+		path == "/v1/chat/completions" ||
+		strings.HasPrefix(path, "/api/")
+}
+
+func authorizeAPIRequest(r *http.Request) bool {
+	keys := conf.App.Server.APIKeys
+	if len(keys) == 0 {
+		return true
+	}
+	got := requestAPIKey(r)
+	if got == "" {
+		return false
+	}
+	for _, key := range keys {
+		if subtle.ConstantTimeCompare([]byte(got), []byte(key)) == 1 {
+			return true
+		}
+	}
+	return false
+}
+
+func requestAPIKey(r *http.Request) string {
+	if raw := strings.TrimSpace(r.Header.Get("Authorization")); raw != "" {
+		const prefix = "Bearer "
+		if strings.HasPrefix(raw, prefix) {
+			return strings.TrimSpace(strings.TrimPrefix(raw, prefix))
+		}
+	}
+	return strings.TrimSpace(r.Header.Get("X-DeepAgent-API-Key"))
+}
+
+func allowByRateLimit(w http.ResponseWriter, r *http.Request) bool {
+	limit := conf.App.Server.RateLimitPerMinute
+	if limit <= 0 || infra.RDB == nil {
+		return true
+	}
+	identity := requestAPIKey(r)
+	if identity == "" {
+		identity = clientIP(r)
+	}
+	if identity == "" {
+		identity = "unknown"
+	}
+	window := time.Now().Unix() / 60
+	key := fmt.Sprintf("deepagent:rate:%s:%d", hashRateIdentity(identity), window)
+	count, err := infra.RDB.Incr(r.Context(), key).Result()
+	if err != nil {
+		log.Printf("[rate_limit] incr failed: %v", err)
+		return true
+	}
+	if count == 1 {
+		_ = infra.RDB.Expire(r.Context(), key, 2*time.Minute).Err()
+	}
+	if count > int64(limit) {
+		w.Header().Set("Retry-After", "60")
+		http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
+		return false
+	}
+	return true
+}
+
+func hashRateIdentity(identity string) string {
+	sum := sha256.Sum256([]byte(identity))
+	return hex.EncodeToString(sum[:])
+}
+
+func clientIP(r *http.Request) string {
+	if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); forwarded != "" {
+		if first, _, ok := strings.Cut(forwarded, ","); ok {
+			return strings.TrimSpace(first)
+		}
+		return forwarded
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 func frontendDir() string {
