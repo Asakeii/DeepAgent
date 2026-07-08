@@ -190,6 +190,7 @@ func runServer() {
 	mux.HandleFunc("/api/sessions", handler.ListSessions)
 	mux.HandleFunc("/api/messages", handler.LoadMessages)
 	mux.HandleFunc("/api/run-events", handler.ListRunEvents)
+	mux.HandleFunc("/api/runs/cancel", handler.CancelRun)
 	mux.HandleFunc("/api/tool-audits", handler.ListToolAudits)
 	mux.HandleFunc("/api/metrics/runs", handler.RunMetrics)
 	mux.HandleFunc("/api/memories", handler.Memories)

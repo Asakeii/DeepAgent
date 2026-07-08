@@ -80,6 +80,16 @@ type ListRunEventsResponse struct {
 	Events []*RunEventResp `json:"events"`
 }
 
+type CancelRunRequest struct {
+	RunID string `json:"run_id"`
+}
+
+type CancelRunResponse struct {
+	RunID     string `json:"run_id"`
+	Status    string `json:"status"`
+	Cancelled bool   `json:"cancelled"`
+}
+
 type ToolAuditResp struct {
 	ID         int64  `json:"id"`
 	RunID      string `json:"run_id"`

@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS runs (
     started_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ended_at    TIMESTAMP NULL,
     error       TEXT,
+    cancel_requested_at TIMESTAMP NULL,
     KEY idx_thread_started (thread_id, started_at),
     KEY idx_user_started (user_id, started_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -1,0 +1,1 @@
+ALTER TABLE runs ADD COLUMN IF NOT EXISTS cancel_requested_at TIMESTAMP NULL;

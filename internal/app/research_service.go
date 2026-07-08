@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"sync"
@@ -90,6 +91,9 @@ func (s *ResearchService) Run(ctx context.Context, req model.ChatRequest, writer
 			writeInterrupt(writer, req.ThreadID)
 			return ResearchRunResult{}, nil
 		}
+		if errors.Is(err, context.Canceled) {
+			return ResearchRunResult{}, err
+		}
 		_ = writer.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "run graph failed: " + err.Error()})
 		return ResearchRunResult{}, err
 	}
@@ -102,6 +106,9 @@ func (s *ResearchService) Run(ctx context.Context, req model.ChatRequest, writer
 			if _, ok := compose.ExtractInterruptInfo(recvErr); ok {
 				writeInterrupt(writer, req.ThreadID)
 				return ResearchRunResult{}, nil
+			}
+			if errors.Is(recvErr, context.Canceled) {
+				return ResearchRunResult{}, recvErr
 			}
 			if recvErr != io.EOF {
 				_ = writer.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "stream failed: " + recvErr.Error()})

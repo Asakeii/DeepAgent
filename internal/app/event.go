@@ -109,6 +109,14 @@ func (w *RunEventWriter) WriteEvent(event string, payload any) error {
 	return w.inner.WriteEvent(event, payload)
 }
 
+func (w *RunEventWriter) WritePassthroughEvent(event string, payload any) error {
+	payload = w.enrichPayload(event, payload)
+	if w.inner == nil {
+		return nil
+	}
+	return w.inner.WriteEvent(event, payload)
+}
+
 func (w *RunEventWriter) RunID() string {
 	return w.runID
 }

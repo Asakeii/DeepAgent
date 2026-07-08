@@ -67,8 +67,10 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 	}); err != nil {
 		log.Printf("[run] create run=%s thread=%s: %v", req.RunID, req.ThreadID, err)
 	}
+	runCtx, stopCancellationWatcher := withRunCancellation(ctx, req.RunID)
+	defer stopCancellationWatcher()
 	runWriter := NewRunEventWriter(infra.DB, req.RunID, req.ThreadID, req.UserID, writer)
-	toolCtx := toolruntime.WithAuditContext(ctx, toolruntime.AuditContext{
+	toolCtx := toolruntime.WithAuditContext(runCtx, toolruntime.AuditContext{
 		RunID:    req.RunID,
 		ThreadID: req.ThreadID,
 		UserID:   req.UserID,
@@ -76,7 +78,9 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 	defer func() {
 		status := store.RunStatusSucceeded
 		errText := ""
-		if failed, captured := runWriter.Failed(); failed {
+		if isRunCancelled(req.RunID) {
+			status = store.RunStatusCancelled
+		} else if failed, captured := runWriter.Failed(); failed {
 			status = store.RunStatusFailed
 			errText = captured
 		}
@@ -85,12 +89,16 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 		}
 	}()
 
-	detach := s.Reminders.AttachStream(ctx, req.ThreadID, runWriter)
+	detach := s.Reminders.AttachStream(runCtx, req.ThreadID, runWriter)
 	defer detach()
 
 	if req.ImageBase64 != "" {
 		resp, err := s.Checkin.AnalyzeImage(toolCtx, req)
 		if err != nil {
+			if isRunCancelled(req.RunID) {
+				writeRunCancelled(runWriter, req.RunID, req.ThreadID)
+				return
+			}
 			_ = runWriter.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "分析失败: " + err.Error()})
 			return
 		}
@@ -100,6 +108,9 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 
 	result, err := s.Research.Run(toolCtx, req, runWriter)
 	if err != nil {
+		if isRunCancelled(req.RunID) {
+			writeRunCancelled(runWriter, req.RunID, req.ThreadID)
+		}
 		return
 	}
 	if result.RouteToCheckin {
@@ -110,6 +121,9 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 			Messages: req.Messages,
 		})
 		if err != nil {
+			if isRunCancelled(req.RunID) {
+				writeRunCancelled(runWriter, req.RunID, req.ThreadID)
+			}
 			return
 		}
 		s.Checkin.EmitResult(runWriter, req.ThreadID, checkinResult)
