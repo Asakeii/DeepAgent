@@ -61,6 +61,20 @@ func TestCreateAndListArtifacts(t *testing.T) {
 	if records[0].Format != ArtifactFormatMD || records[0].Source != ArtifactSourceAgent {
 		t.Fatalf("unexpected defaults: %+v", records[0])
 	}
+	got, err := GetArtifact(ctx, db, records[0].ID, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != records[0].ID || got.UserID != userID {
+		t.Fatalf("unexpected artifact lookup: %+v", got)
+	}
+	other, err := GetArtifact(ctx, db, records[0].ID, "other-user-"+randomSuffix())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if other.ID != 0 {
+		t.Fatalf("artifact should not be visible to another user: %+v", other)
+	}
 }
 
 func TestCreateArtifactRejectsInvalidMetadata(t *testing.T) {

@@ -9,14 +9,15 @@ require (
 	github.com/eino-contrib/jsonschema v1.0.3
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/mark3labs/mcp-go v0.54.1
+	github.com/redis/go-redis/v9 v9.21.0
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/yuin/goldmark v1.8.2
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/redis/go-redis/v9 v9.21.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 )
 
@@ -31,7 +32,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/evanphx/json-patch v0.5.2 // indirect
 	github.com/google/jsonschema-go v0.4.2 // indirect
-	github.com/google/uuid v1.6.0 // indirect
+	github.com/google/uuid v1.6.0
 	github.com/goph/emperror v0.17.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect

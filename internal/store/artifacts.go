@@ -151,6 +151,31 @@ func ListArtifacts(ctx context.Context, db *sql.DB, userID, threadID, kind strin
 	return out, rows.Err()
 }
 
+func GetArtifact(ctx context.Context, db *sql.DB, artifactID int64, userID string) (ArtifactRecord, error) {
+	if db == nil {
+		return ArtifactRecord{}, fmt.Errorf("db is nil")
+	}
+	if artifactID <= 0 {
+		return ArtifactRecord{}, fmt.Errorf("artifact id is required")
+	}
+	userID = NormalizeUserID(userID)
+	var record ArtifactRecord
+	err := db.QueryRowContext(ctx,
+		`SELECT id, user_id, thread_id, run_id, kind, title, format, content,
+		 COALESCE(metadata, JSON_OBJECT()), version, source, created_at, updated_at
+		 FROM artifacts
+		 WHERE id=? AND user_id=?`,
+		artifactID, userID,
+	).Scan(&record.ID, &record.UserID, &record.ThreadID, &record.RunID, &record.Kind, &record.Title, &record.Format, &record.Content, &record.Metadata, &record.Version, &record.Source, &record.CreatedAt, &record.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return ArtifactRecord{}, nil
+	}
+	if err != nil {
+		return ArtifactRecord{}, fmt.Errorf("get artifact: %w", err)
+	}
+	return record, nil
+}
+
 func normalizeArtifact(record *ArtifactRecord) {
 	record.UserID = NormalizeUserID(record.UserID)
 	record.ThreadID = strings.TrimSpace(record.ThreadID)

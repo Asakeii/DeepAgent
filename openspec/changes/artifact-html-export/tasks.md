@@ -1,0 +1,9 @@
+- [x] 引入成熟 Markdown 渲染库。
+- [x] 新增 artifact 按用户读取 Store 方法。
+- [x] 新增 HTML 导出 HTTP 接口。
+- [x] 导出接口校验 artifact 归属。
+- [x] 返回完整 HTML 文档和下载头。
+- [x] 补充 HTML 渲染和 artifact 读取测试。
+- [ ] 后续：基于 HTML 产物生成 PDF。
+- [ ] 后续：公开分享页支持导出按钮。
+- [ ] 后续：导出访问审计和统计。

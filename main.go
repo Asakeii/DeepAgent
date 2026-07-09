@@ -198,6 +198,7 @@ func runServer() {
 	mux.HandleFunc("/api/metrics/runs", handler.RunMetrics)
 	mux.HandleFunc("/api/memories", handler.Memories)
 	mux.HandleFunc("/api/artifacts", handler.ListArtifacts)
+	mux.HandleFunc("/api/artifact-exports", handler.ExportArtifact)
 	mux.HandleFunc("/api/artifact-shares", handler.ArtifactShares)
 	mux.HandleFunc("/api/artifact-citations", handler.ListArtifactCitations)
 	mux.HandleFunc("/api/settings", handler.UserSettings)
