@@ -47,5 +47,10 @@ func RunMetrics(w http.ResponseWriter, r *http.Request) {
 		ToolsBlocked:      metrics.ToolsBlocked,
 		ToolErrorRate:     metrics.ToolErrorRate,
 		AvgToolDurationMS: metrics.AvgToolDurationMS,
+		PromptTokens:      metrics.PromptTokens,
+		CompletionTokens:  metrics.CompletionTokens,
+		TotalTokens:       metrics.TotalTokens,
+		CachedTokens:      metrics.CachedTokens,
+		ReasoningTokens:   metrics.ReasoningTokens,
 	})
 }

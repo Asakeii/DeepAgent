@@ -16,6 +16,7 @@ import (
 	"github.com/cloudwego/eino/schema"
 
 	"deepAgent/internal/model"
+	"deepAgent/internal/store"
 )
 
 // SSEWriter 是基于 net/http 的简单 SSE 写入器。
@@ -108,8 +109,10 @@ func flushResponse(w http.ResponseWriter) {
 type LoggerCallback struct {
 	callbacks.HandlerBuilder
 
-	ID  string
-	SSE *SSEWriter
+	ID     string
+	RunID  string
+	UserID string
+	SSE    *SSEWriter
 	// Events allows non-HTTP application services to receive the same event
 	// stream without depending on the concrete SSE writer type.
 	Events EventWriter
@@ -291,6 +294,9 @@ func (cb *LoggerCallback) OnStart(ctx context.Context, info *callbacks.RunInfo, 
 }
 
 func (cb *LoggerCallback) OnEnd(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
+	if out, ok := output.(*ecmodel.CallbackOutput); ok {
+		cb.recordModelUsage(cb.agentName(ctx), out)
+	}
 	return ctx
 }
 
@@ -343,6 +349,7 @@ func (cb *LoggerCallback) OnEndWithStreamOutput(
 					_ = cb.pushMsg(ctx, msgID, v)
 				}
 			case *ecmodel.CallbackOutput:
+				cb.recordModelUsage(agentName, v)
 				if v.Message != nil && v.Message.Role == schema.Assistant && len(v.Message.ToolCalls) == 0 {
 					content.WriteString(v.Message.Content)
 				}
@@ -363,6 +370,29 @@ func (cb *LoggerCallback) OnEndWithStreamOutput(
 	}()
 
 	return ctx
+}
+
+func (cb *LoggerCallback) recordModelUsage(agentName string, output *ecmodel.CallbackOutput) {
+	if output == nil || output.TokenUsage == nil || cb.RunID == "" || DB == nil {
+		return
+	}
+	modelName := ""
+	if output.Config != nil {
+		modelName = output.Config.Model
+	}
+	usage := output.TokenUsage
+	_ = store.AppendModelUsage(context.Background(), DB, store.ModelUsageRecord{
+		RunID:            cb.RunID,
+		ThreadID:         cb.ID,
+		UserID:           cb.UserID,
+		Agent:            agentName,
+		Model:            modelName,
+		PromptTokens:     usage.PromptTokens,
+		CompletionTokens: usage.CompletionTokens,
+		TotalTokens:      usage.TotalTokens,
+		CachedTokens:     usage.PromptTokenDetails.CachedTokens,
+		ReasoningTokens:  usage.CompletionTokensDetails.ReasoningTokens,
+	})
 }
 
 func (cb *LoggerCallback) OnStartWithStreamInput(

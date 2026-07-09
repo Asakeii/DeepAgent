@@ -83,7 +83,13 @@ func (s *ResearchService) Run(ctx context.Context, req model.ChatRequest, writer
 	}
 
 	finalCh := make(chan string, 1)
-	opts = append(opts, compose.WithCallbacks(&infra.LoggerCallback{ID: req.ThreadID, Events: routeWriter, Final: finalCh}))
+	opts = append(opts, compose.WithCallbacks(&infra.LoggerCallback{
+		ID:     req.ThreadID,
+		RunID:  req.RunID,
+		UserID: req.UserID,
+		Events: routeWriter,
+		Final:  finalCh,
+	}))
 
 	out, err := runnable.Stream(ctx, consts.Coordinator, opts...)
 	if err != nil {

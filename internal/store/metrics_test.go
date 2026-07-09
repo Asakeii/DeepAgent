@@ -62,6 +62,20 @@ func TestGetRunMetricsWithMySQL(t *testing.T) {
 	if err := CompleteToolAudit(ctx, db, toolID, ToolStatusFailed, "", "boom", 25); err != nil {
 		t.Fatal(err)
 	}
+	if err := AppendModelUsage(ctx, db, ModelUsageRecord{
+		RunID:            runOK,
+		ThreadID:         threadID,
+		UserID:           userID,
+		Agent:            "researcher",
+		Model:            "test-model",
+		PromptTokens:     100,
+		CompletionTokens: 50,
+		TotalTokens:      150,
+		CachedTokens:     10,
+		ReasoningTokens:  5,
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	metrics, err := GetRunMetrics(ctx, db, userID, 24)
 	if err != nil {
@@ -76,7 +90,14 @@ func TestGetRunMetricsWithMySQL(t *testing.T) {
 	if metrics.ToolsTotal != 2 || metrics.ToolsFailed != 1 {
 		t.Fatalf("unexpected tool metrics: %+v", metrics)
 	}
+	if metrics.TotalTokens != 150 || metrics.PromptTokens != 100 || metrics.CompletionTokens != 50 {
+		t.Fatalf("unexpected token metrics: %+v", metrics)
+	}
+	if metrics.CachedTokens != 10 || metrics.ReasoningTokens != 5 {
+		t.Fatalf("unexpected token detail metrics: %+v", metrics)
+	}
 
+	_, _ = db.ExecContext(ctx, "DELETE FROM model_usage_logs WHERE user_id=?", userID)
 	_, _ = db.ExecContext(ctx, "DELETE FROM tool_audit_logs WHERE user_id=?", userID)
 	_, _ = db.ExecContext(ctx, "DELETE FROM runs WHERE user_id=?", userID)
 }

@@ -24,6 +24,11 @@ type RunMetrics struct {
 	ToolsBlocked      int
 	ToolErrorRate     float64
 	AvgToolDurationMS int64
+	PromptTokens      int64
+	CompletionTokens  int64
+	TotalTokens       int64
+	CachedTokens      int64
+	ReasoningTokens   int64
 }
 
 func GetRunMetrics(ctx context.Context, db *sql.DB, userID string, windowHours int) (RunMetrics, error) {
@@ -76,6 +81,9 @@ func GetRunMetrics(ctx context.Context, db *sql.DB, userID string, windowHours i
 	out.P95RunLatencyMS = percentileInt64(latencies, 0.95)
 
 	if err := fillToolMetrics(ctx, db, userID, since, &out); err != nil {
+		return out, err
+	}
+	if err := fillModelUsageMetrics(ctx, db, userID, since, &out); err != nil {
 		return out, err
 	}
 	return out, nil
@@ -141,6 +149,23 @@ func fillToolMetrics(ctx context.Context, db *sql.DB, userID string, since time.
 		out.AvgToolDurationMS = weightedDuration / int64(out.ToolsTotal)
 	}
 	return rows.Err()
+}
+
+func fillModelUsageMetrics(ctx context.Context, db *sql.DB, userID string, since time.Time, out *RunMetrics) error {
+	err := db.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(prompt_tokens), 0),
+		 COALESCE(SUM(completion_tokens), 0),
+		 COALESCE(SUM(total_tokens), 0),
+		 COALESCE(SUM(cached_tokens), 0),
+		 COALESCE(SUM(reasoning_tokens), 0)
+		 FROM model_usage_logs
+		 WHERE user_id=? AND created_at>=?`,
+		userID, since,
+	).Scan(&out.PromptTokens, &out.CompletionTokens, &out.TotalTokens, &out.CachedTokens, &out.ReasoningTokens)
+	if err != nil {
+		return fmt.Errorf("query model usage metrics: %w", err)
+	}
+	return nil
 }
 
 func averageInt64(values []int64) int64 {

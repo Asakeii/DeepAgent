@@ -1,0 +1,7 @@
+- [x] 新增 `model_usage_logs` 表和迁移。
+- [x] 新增 model usage store。
+- [x] LoggerCallback 复用 Eino `TokenUsage` 写入模型用量。
+- [x] run metrics 汇总 token usage。
+- [x] 补充 model usage 和 metrics 测试。
+- [ ] 后续：覆盖 Checkin / Vision 直接模型调用。
+- [ ] 后续：接入模型价格配置和预算拦截。

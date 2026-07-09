@@ -124,6 +124,11 @@ type RunMetricsResp struct {
 	ToolsBlocked      int     `json:"tools_blocked"`
 	ToolErrorRate     float64 `json:"tool_error_rate"`
 	AvgToolDurationMS int64   `json:"avg_tool_duration_ms"`
+	PromptTokens      int64   `json:"prompt_tokens"`
+	CompletionTokens  int64   `json:"completion_tokens"`
+	TotalTokens       int64   `json:"total_tokens"`
+	CachedTokens      int64   `json:"cached_tokens"`
+	ReasoningTokens   int64   `json:"reasoning_tokens"`
 }
 
 type MemoryResp struct {
