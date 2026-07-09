@@ -4,6 +4,8 @@
 - [x] 新增 `/api/admin/overview` 只读接口。
 - [x] 聚合 run、tool、token、artifact 和分享指标。
 - [x] 补充 middleware 和 store 测试。
-- [ ] 后续：前端管理台页面。
+- [x] 前端新增管理概览页面。
+- [x] 前端支持 Admin API Key、窗口切换和手动刷新。
+- [x] 前端展示用户、会话、产物、分享、run、tool、token 指标。
 - [ ] 后续：管理员操作审计。
 - [ ] 后续：趋势指标和告警。

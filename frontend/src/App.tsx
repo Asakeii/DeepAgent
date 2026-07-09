@@ -6,12 +6,14 @@ import { RemindersPanel } from "./components/RemindersPanel";
 import { ActivityPanel } from "./components/ActivityPanel";
 import { SessionSidebar } from "./components/SessionSidebar";
 import { TopBar } from "./components/TopBar";
+import { AdminOverview } from "./components/AdminOverview";
 import { extractUrls } from "./lib/format";
-import { listReminders, listSessions, loadMessages, newThreadId, streamChat, toggleReminder, type StreamEvent } from "./lib/api";
-import type { AgentName, ChatMessage, Plan, ReminderInfo, SessionInfo, ToolActivity, TranscriptItem } from "./types";
+import { listReminders, listSessions, loadAdminOverview, loadMessages, newThreadId, streamChat, toggleReminder, type StreamEvent } from "./lib/api";
+import type { AdminOverviewInfo, AgentName, ChatMessage, Plan, ReminderInfo, SessionInfo, ToolActivity, TranscriptItem } from "./types";
 
 const ASSISTANT_PLACEHOLDER = "";
 const HIDDEN_ASSISTANT_CONTENT = new Set(["end", "processed"]);
+const ADMIN_KEY_STORAGE = "deepagent.admin_api_key";
 
 function isAssistantSentinel(content?: string) {
   const normalized = (content ?? "").trim().toLowerCase();
@@ -28,7 +30,7 @@ export function App() {
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sessionQuery, setSessionQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia("(min-width: 900px)").matches);
-  const [view, setView] = useState<"workspace" | "reminders">("workspace");
+  const [view, setView] = useState<"workspace" | "reminders" | "admin">("workspace");
   const [items, setItems] = useState<TranscriptItem[]>([]);
   const [input, setInput] = useState("");
   const [image, setImage] = useState<string | undefined>();
@@ -40,6 +42,11 @@ export function App() {
   const [tools, setTools] = useState<ToolActivity[]>([]);
   const [reminders, setReminders] = useState<ReminderInfo[]>([]);
   const [remindersLoading, setRemindersLoading] = useState(false);
+  const [adminKey, setAdminKey] = useState(() => localStorage.getItem(ADMIN_KEY_STORAGE) ?? "");
+  const [adminWindowHours, setAdminWindowHours] = useState(24);
+  const [adminOverview, setAdminOverview] = useState<AdminOverviewInfo | undefined>();
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminError, setAdminError] = useState<string | undefined>();
   const assistantIdRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const suppressNextReminderMessageRef = useRef(false);
@@ -154,9 +161,42 @@ export function App() {
     assistantIdRef.current = null;
   }, []);
 
-  const switchView = useCallback((nextView: "workspace" | "reminders") => {
+  const switchView = useCallback((nextView: "workspace" | "reminders" | "admin") => {
     setView(nextView);
   }, []);
+
+  const updateAdminKey = useCallback((value: string) => {
+    setAdminKey(value);
+    if (value.trim()) {
+      localStorage.setItem(ADMIN_KEY_STORAGE, value);
+    } else {
+      localStorage.removeItem(ADMIN_KEY_STORAGE);
+    }
+  }, []);
+
+  const refreshAdminOverview = useCallback(async () => {
+    if (!adminKey.trim()) {
+      setAdminOverview(undefined);
+      setAdminError(undefined);
+      return;
+    }
+    setAdminLoading(true);
+    setAdminError(undefined);
+    try {
+      setAdminOverview(await loadAdminOverview(adminKey.trim(), adminWindowHours));
+    } catch (error) {
+      setAdminOverview(undefined);
+      setAdminError(error instanceof Error ? error.message : "管理概览加载失败");
+    } finally {
+      setAdminLoading(false);
+    }
+  }, [adminKey, adminWindowHours]);
+
+  useEffect(() => {
+    if (view === "admin" && adminKey.trim()) {
+      void refreshAdminOverview();
+    }
+  }, [adminKey, refreshAdminOverview, view]);
 
   const handleStreamEvent = useCallback(
     (event: StreamEvent) => {
@@ -544,7 +584,7 @@ export function App() {
                 <ActivityPanel activeAgent={activeAgent} plan={plan} tools={tools} busy={busy} />
               </aside>
             </>
-          ) : (
+          ) : view === "reminders" ? (
             <section className="reminders-page" aria-label="提醒管理">
               <div className="reminders-page-header">
                 <div>
@@ -563,6 +603,17 @@ export function App() {
                 showHeader={false}
               />
             </section>
+          ) : (
+            <AdminOverview
+              adminKey={adminKey}
+              windowHours={adminWindowHours}
+              overview={adminOverview}
+              loading={adminLoading}
+              error={adminError}
+              onAdminKeyChange={updateAdminKey}
+              onWindowHoursChange={setAdminWindowHours}
+              onRefresh={() => void refreshAdminOverview()}
+            />
           )}
         </div>
       </div>

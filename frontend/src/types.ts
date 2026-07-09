@@ -96,6 +96,28 @@ export interface ReminderInfo {
   status: "scheduled" | "paused" | "fired" | "cancelled" | string;
 }
 
+export interface AdminOverviewInfo {
+  window_hours: number;
+  users_total: number;
+  threads_total: number;
+  artifacts_total: number;
+  artifact_shares: number;
+  runs_total: number;
+  runs_succeeded: number;
+  runs_failed: number;
+  runs_running: number;
+  run_success_rate: number;
+  tools_total: number;
+  tools_failed: number;
+  tools_blocked: number;
+  tool_error_rate: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  cached_tokens: number;
+  reasoning_tokens: number;
+}
+
 export interface TranscriptItem {
   id: string;
   role: "user" | "assistant" | "notice" | "reminder";

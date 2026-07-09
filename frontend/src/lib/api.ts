@@ -1,4 +1,4 @@
-import type { ChatEventPayload, ChatMessage, ReminderInfo, SessionInfo, StreamRequest } from "../types";
+import type { AdminOverviewInfo, ChatEventPayload, ChatMessage, ReminderInfo, SessionInfo, StreamRequest } from "../types";
 
 export interface StreamEvent {
   event: string;
@@ -119,6 +119,21 @@ export async function toggleReminder(threadId: string, reminderId: string, activ
 
   const payload = await response.json();
   return payload.reminder as ReminderInfo;
+}
+
+export async function loadAdminOverview(adminKey: string, windowHours: number): Promise<AdminOverviewInfo> {
+  const params = new URLSearchParams({ window_hours: String(windowHours) });
+  const response = await fetch(`/api/admin/overview?${params.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${adminKey}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Load admin overview failed (${response.status})`);
+  }
+
+  return (await response.json()) as AdminOverviewInfo;
 }
 
 function parseEventBlock(block: string): StreamEvent | null {

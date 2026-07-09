@@ -1,4 +1,4 @@
-import { Bell, HeartPulse, History, MessageSquarePlus, PanelLeft, Search } from "lucide-react";
+import { Bell, HeartPulse, History, MessageSquare, MessageSquarePlus, PanelLeft, Search, ShieldCheck } from "lucide-react";
 import type { AgentName } from "../types";
 
 const agentLabels: Record<string, string> = {
@@ -18,11 +18,11 @@ interface TopBarProps {
   sidebarOpen: boolean;
   planReviewEnabled: boolean;
   busy: boolean;
-  view: "workspace" | "reminders";
+  view: "workspace" | "reminders" | "admin";
   onToggleSidebar: () => void;
   onNew: () => void;
   onTogglePlanReview: (value: boolean) => void;
-  onSwitchView: (view: "workspace" | "reminders") => void;
+  onSwitchView: (view: "workspace" | "reminders" | "admin") => void;
 }
 
 export function TopBar({
@@ -69,7 +69,8 @@ export function TopBar({
             aria-selected={view === "workspace"}
             onClick={() => onSwitchView("workspace")}
           >
-            对话
+            <MessageSquare size={15} />
+            <span className="view-tab-label">对话</span>
           </button>
           <button
             className={`view-tab ${view === "reminders" ? "active" : ""}`}
@@ -79,7 +80,17 @@ export function TopBar({
             onClick={() => onSwitchView("reminders")}
           >
             <Bell size={15} />
-            提醒
+            <span className="view-tab-label">提醒</span>
+          </button>
+          <button
+            className={`view-tab ${view === "admin" ? "active" : ""}`}
+            type="button"
+            role="tab"
+            aria-selected={view === "admin"}
+            onClick={() => onSwitchView("admin")}
+          >
+            <ShieldCheck size={15} />
+            <span className="view-tab-label">管理</span>
           </button>
         </div>
 
