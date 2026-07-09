@@ -108,6 +108,46 @@ func TestHTTPGuardsAllowBearerAPIKey(t *testing.T) {
 	}
 }
 
+func TestHTTPGuardsRequireAdminAPIKeyForAdminRoutes(t *testing.T) {
+	withTestServerConfig(t, conf.ServerConfig{
+		AllowedOrigins: []string{"https://app.example.com"},
+		MaxBodyBytes:   1024,
+		APIKeys:        []string{"user-secret"},
+		AdminAPIKeys:   []string{"admin-secret"},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/overview", nil)
+	req.Header.Set("Authorization", "Bearer user-secret")
+	rec := httptest.NewRecorder()
+
+	withHTTPGuards(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("handler should not be called")
+	})).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status=%d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestHTTPGuardsAllowAdminAPIKey(t *testing.T) {
+	withTestServerConfig(t, conf.ServerConfig{
+		AllowedOrigins: []string{"https://app.example.com"},
+		MaxBodyBytes:   1024,
+		APIKeys:        []string{"user-secret"},
+		AdminAPIKeys:   []string{"admin-secret"},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/overview", nil)
+	req.Header.Set("Authorization", "Bearer admin-secret")
+	rec := httptest.NewRecorder()
+
+	withHTTPGuards(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
 func TestHTTPGuardsDoNotProtectStaticRoutes(t *testing.T) {
 	withTestServerConfig(t, conf.ServerConfig{
 		AllowedOrigins: []string{"https://app.example.com"},

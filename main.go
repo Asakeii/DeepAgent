@@ -196,6 +196,7 @@ func runServer() {
 	mux.HandleFunc("/api/runs/cancel", handler.CancelRun)
 	mux.HandleFunc("/api/tool-audits", handler.ListToolAudits)
 	mux.HandleFunc("/api/metrics/runs", handler.RunMetrics)
+	mux.HandleFunc("/api/admin/overview", handler.AdminOverview)
 	mux.HandleFunc("/api/memories", handler.Memories)
 	mux.HandleFunc("/api/artifacts", handler.ListArtifacts)
 	mux.HandleFunc("/api/artifact-exports", handler.ExportArtifact)
@@ -224,7 +225,11 @@ func withHTTPGuards(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		if requiresAPIProtection(r.URL.Path) && !authorizeAPIRequest(r) {
+		if requiresAdminProtection(r.URL.Path) && !authorizeAdminRequest(r) {
+			http.Error(w, "admin unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if !requiresAdminProtection(r.URL.Path) && requiresAPIProtection(r.URL.Path) && !authorizeAPIRequest(r) {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -261,10 +266,31 @@ func requiresAPIProtection(path string) bool {
 		strings.HasPrefix(path, "/api/")
 }
 
+func requiresAdminProtection(path string) bool {
+	return strings.HasPrefix(path, "/api/admin/")
+}
+
 func authorizeAPIRequest(r *http.Request) bool {
 	keys := conf.App.Server.APIKeys
 	if len(keys) == 0 {
 		return true
+	}
+	got := requestAPIKey(r)
+	if got == "" {
+		return false
+	}
+	for _, key := range keys {
+		if subtle.ConstantTimeCompare([]byte(got), []byte(key)) == 1 {
+			return true
+		}
+	}
+	return false
+}
+
+func authorizeAdminRequest(r *http.Request) bool {
+	keys := conf.App.Server.AdminAPIKeys
+	if len(keys) == 0 {
+		return authorizeAPIRequest(r)
 	}
 	got := requestAPIKey(r)
 	if got == "" {

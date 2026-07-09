@@ -132,6 +132,28 @@ type RunMetricsResp struct {
 	ReasoningTokens   int64   `json:"reasoning_tokens"`
 }
 
+type AdminOverviewResp struct {
+	WindowHours      int     `json:"window_hours"`
+	UsersTotal       int     `json:"users_total"`
+	ThreadsTotal     int     `json:"threads_total"`
+	ArtifactsTotal   int     `json:"artifacts_total"`
+	ArtifactShares   int     `json:"artifact_shares"`
+	RunsTotal        int     `json:"runs_total"`
+	RunsSucceeded    int     `json:"runs_succeeded"`
+	RunsFailed       int     `json:"runs_failed"`
+	RunsRunning      int     `json:"runs_running"`
+	RunSuccessRate   float64 `json:"run_success_rate"`
+	ToolsTotal       int     `json:"tools_total"`
+	ToolsFailed      int     `json:"tools_failed"`
+	ToolsBlocked     int     `json:"tools_blocked"`
+	ToolErrorRate    float64 `json:"tool_error_rate"`
+	PromptTokens     int64   `json:"prompt_tokens"`
+	CompletionTokens int64   `json:"completion_tokens"`
+	TotalTokens      int64   `json:"total_tokens"`
+	CachedTokens     int64   `json:"cached_tokens"`
+	ReasoningTokens  int64   `json:"reasoning_tokens"`
+}
+
 type MemoryResp struct {
 	ID         int64  `json:"id"`
 	UserID     string `json:"user_id,omitempty"`

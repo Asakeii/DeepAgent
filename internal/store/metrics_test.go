@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"testing"
 )
@@ -100,4 +101,94 @@ func TestGetRunMetricsWithMySQL(t *testing.T) {
 	_, _ = db.ExecContext(ctx, "DELETE FROM model_usage_logs WHERE user_id=?", userID)
 	_, _ = db.ExecContext(ctx, "DELETE FROM tool_audit_logs WHERE user_id=?", userID)
 	_, _ = db.ExecContext(ctx, "DELETE FROM runs WHERE user_id=?", userID)
+}
+
+func TestGetAdminOverviewWithMySQL(t *testing.T) {
+	db := DBForTest(t)
+	if db == nil {
+		t.Skip("mysql not available")
+	}
+	ctx := context.Background()
+	userID := "admin-user-" + randomSuffix()
+	threadID := "admin-thread-" + randomSuffix()
+	runOK := "admin-run-ok-" + randomSuffix()
+	runFailed := "admin-run-failed-" + randomSuffix()
+	args, _ := json.Marshal(map[string]any{"x": 1})
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, "DELETE FROM model_usage_logs WHERE user_id=?", userID)
+		_, _ = db.ExecContext(ctx, "DELETE FROM tool_audit_logs WHERE user_id=?", userID)
+		_, _ = db.ExecContext(ctx, "DELETE FROM artifact_shares WHERE user_id=?", userID)
+		_, _ = db.ExecContext(ctx, "DELETE FROM artifacts WHERE user_id=?", userID)
+		_, _ = db.ExecContext(ctx, "DELETE FROM runs WHERE user_id=?", userID)
+		_, _ = db.ExecContext(ctx, "DELETE FROM threads WHERE user_id=?", userID)
+		_, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id=?", userID)
+	})
+
+	if err := EnsureThread(ctx, db, threadID, userID, "Admin overview", "chat"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO runs (id, user_id, thread_id, mode, status, started_at, ended_at)
+		VALUES (?, ?, ?, 'chat', 'succeeded', DATE_SUB(NOW(), INTERVAL 2 SECOND), NOW())`,
+		runOK, userID, threadID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO runs (id, user_id, thread_id, mode, status, started_at, ended_at, error)
+		VALUES (?, ?, ?, 'chat', 'failed', DATE_SUB(NOW(), INTERVAL 1 SECOND), NOW(), 'boom')`,
+		runFailed, userID, threadID); err != nil {
+		t.Fatal(err)
+	}
+	toolID, err := StartToolAudit(ctx, db, ToolAuditRecord{
+		RunID:     runFailed,
+		ThreadID:  threadID,
+		UserID:    userID,
+		ToolName:  "web_search",
+		Risk:      "external",
+		Arguments: args,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := CompleteToolAudit(ctx, db, toolID, ToolStatusBlocked, "", "blocked", 15); err != nil {
+		t.Fatal(err)
+	}
+	if err := AppendModelUsage(ctx, db, ModelUsageRecord{
+		RunID:            runOK,
+		ThreadID:         threadID,
+		UserID:           userID,
+		Agent:            "reporter",
+		Model:            "test-model",
+		PromptTokens:     30,
+		CompletionTokens: 20,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	artifactID, err := CreateArtifact(ctx, db, ArtifactRecord{
+		UserID:   userID,
+		ThreadID: threadID,
+		RunID:    runOK,
+		Content:  "# report",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CreateArtifactShare(ctx, db, artifactID, userID, sql.NullTime{}); err != nil {
+		t.Fatal(err)
+	}
+
+	overview, err := GetAdminOverview(ctx, db, 24)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if overview.UsersTotal < 1 || overview.ThreadsTotal < 1 || overview.ArtifactsTotal < 1 || overview.ArtifactShares < 1 {
+		t.Fatalf("unexpected entity totals: %+v", overview)
+	}
+	if overview.RunsTotal < 2 || overview.RunsSucceeded < 1 || overview.RunsFailed < 1 {
+		t.Fatalf("unexpected run totals: %+v", overview)
+	}
+	if overview.ToolsTotal < 1 || overview.ToolsBlocked < 1 {
+		t.Fatalf("unexpected tool totals: %+v", overview)
+	}
+	if overview.TotalTokens < 50 || overview.PromptTokens < 30 || overview.CompletionTokens < 20 {
+		t.Fatalf("unexpected token totals: %+v", overview)
+	}
 }

@@ -1,0 +1,9 @@
+- [x] 新增 `server.admin_api_keys` 配置。
+- [x] `/api/admin/*` 使用独立 admin key 鉴权。
+- [x] 新增 Admin Overview 聚合 Store。
+- [x] 新增 `/api/admin/overview` 只读接口。
+- [x] 聚合 run、tool、token、artifact 和分享指标。
+- [x] 补充 middleware 和 store 测试。
+- [ ] 后续：前端管理台页面。
+- [ ] 后续：管理员操作审计。
+- [ ] 后续：趋势指标和告警。

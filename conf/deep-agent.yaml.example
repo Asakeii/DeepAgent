@@ -65,6 +65,8 @@ server:
   # Empty api_keys disables API-key auth for local development.
   # Configure one or more keys in production and pass Authorization: Bearer <key>.
   api_keys: []
+  # Admin APIs require one of these keys when configured. Do not reuse normal user API keys.
+  admin_api_keys: []
   # Requires Redis to be initialized; 0 disables rate limiting.
   rate_limit_per_minute: 60
   # 0 uses the default heartbeat interval; negative disables SSE heartbeat.

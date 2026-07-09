@@ -38,6 +38,7 @@ server:
   url_denied_hosts: ["blocked.example"]
   url_allow_private_networks: true
   api_keys: ["test-key"]
+  admin_api_keys: ["admin-key"]
   rate_limit_per_minute: 60
   sse_heartbeat_seconds: 10
 `)
@@ -76,7 +77,7 @@ server:
 	if len(cfg.Server.URLAllowedHosts) != 2 || cfg.Server.URLAllowedHosts[0] != "example.com" || len(cfg.Server.URLDeniedHosts) != 1 || !cfg.Server.URLAllowPrivateNetworks {
 		t.Fatalf("server URL policy config not parsed: %+v", cfg.Server)
 	}
-	if len(cfg.Server.APIKeys) != 1 || cfg.Server.APIKeys[0] != "test-key" || cfg.Server.RateLimitPerMinute != 60 || cfg.Server.SSEHeartbeatSeconds != 10 {
+	if len(cfg.Server.APIKeys) != 1 || cfg.Server.APIKeys[0] != "test-key" || len(cfg.Server.AdminAPIKeys) != 1 || cfg.Server.AdminAPIKeys[0] != "admin-key" || cfg.Server.RateLimitPerMinute != 60 || cfg.Server.SSEHeartbeatSeconds != 10 {
 		t.Fatalf("server security config not parsed: %+v", cfg.Server)
 	}
 }

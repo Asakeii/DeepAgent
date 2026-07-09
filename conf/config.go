@@ -79,6 +79,7 @@ type ServerConfig struct {
 	URLDeniedHosts          []string `yaml:"url_denied_hosts"`
 	URLAllowPrivateNetworks bool     `yaml:"url_allow_private_networks"`
 	APIKeys                 []string `yaml:"api_keys"`
+	AdminAPIKeys            []string `yaml:"admin_api_keys"`
 	RateLimitPerMinute      int      `yaml:"rate_limit_per_minute"`
 	SSEHeartbeatSeconds     int      `yaml:"sse_heartbeat_seconds"`
 }
