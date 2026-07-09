@@ -1,0 +1,5 @@
+- [x] VisionModel 直调读取 `ResponseMeta.Usage`。
+- [x] 图片分析路径写入 `model_usage_logs`。
+- [x] 复用 run/thread/user 审计上下文。
+- [x] 补充 Vision usage 记录测试。
+- [ ] 后续：区分未上报 usage 与零 token。

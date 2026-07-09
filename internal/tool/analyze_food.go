@@ -16,6 +16,8 @@ import (
 	"github.com/cloudwego/eino/schema"
 
 	"deepAgent/internal/security"
+	"deepAgent/internal/store"
+	"deepAgent/internal/toolruntime"
 )
 
 const maxImageBytes = 20 << 20 // 20MB image size limit
@@ -84,6 +86,7 @@ func analyzeFood(ctx context.Context, in analyzeInput, db *sql.DB, visionModel m
 	if err != nil {
 		return analyzeResult{}, fmt.Errorf("vision model generate: %w", err)
 	}
+	recordVisionModelUsage(ctx, db, resp)
 
 	// 3. 解析 JSON 结果（用与 planner.go 同模式的 code-fence 剥离）
 	content := extractCodeFenceJSON(resp.Content)
@@ -112,6 +115,29 @@ func analyzeFood(ctx context.Context, in analyzeInput, db *sql.DB, visionModel m
 	}
 
 	return result, nil
+}
+
+func recordVisionModelUsage(ctx context.Context, db *sql.DB, resp *schema.Message) {
+	if db == nil || resp == nil || resp.ResponseMeta == nil || resp.ResponseMeta.Usage == nil {
+		return
+	}
+	audit := toolruntime.AuditContextFrom(ctx)
+	if audit.RunID == "" || audit.ThreadID == "" {
+		return
+	}
+	usage := resp.ResponseMeta.Usage
+	_ = store.AppendModelUsage(ctx, db, store.ModelUsageRecord{
+		RunID:            audit.RunID,
+		ThreadID:         audit.ThreadID,
+		UserID:           audit.UserID,
+		Agent:            "vision",
+		Model:            "vision",
+		PromptTokens:     usage.PromptTokens,
+		CompletionTokens: usage.CompletionTokens,
+		TotalTokens:      usage.TotalTokens,
+		CachedTokens:     usage.PromptTokenDetails.CachedTokens,
+		ReasoningTokens:  usage.CompletionTokensDetails.ReasoningTokens,
+	})
 }
 
 // readImage loads image bytes from a local path or HTTP URL, with a 20MB size limit.

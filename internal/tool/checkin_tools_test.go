@@ -6,7 +6,11 @@ import (
 	"testing"
 
 	"database/sql"
+	"github.com/cloudwego/eino/schema"
 	_ "github.com/go-sql-driver/mysql"
+
+	"deepAgent/internal/store"
+	"deepAgent/internal/toolruntime"
 )
 
 func storeDBForTest(t *testing.T) *sql.DB {
@@ -76,4 +80,48 @@ func TestQueryCheckinReturnsRows(t *testing.T) {
 		t.Fatalf("expect 2 records, got %d: %v", len(out.Records), out)
 	}
 	_, _ = db.ExecContext(ctx, "DELETE FROM checkins WHERE thread_id=?", tid)
+}
+
+func TestRecordVisionModelUsage(t *testing.T) {
+	db := storeDBForTest(t)
+	if db == nil {
+		t.Skip("mysql not available")
+	}
+	ctx := context.Background()
+	if err := store.RunMigrations(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	runID := "vision-usage-run"
+	threadID := "vision-usage-thread"
+	userID := "vision-usage-user"
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, "DELETE FROM model_usage_logs WHERE run_id=?", runID)
+	})
+
+	ctx = toolruntime.WithAuditContext(ctx, toolruntime.AuditContext{
+		RunID:    runID,
+		ThreadID: threadID,
+		UserID:   userID,
+	})
+	recordVisionModelUsage(ctx, db, &schema.Message{
+		ResponseMeta: &schema.ResponseMeta{
+			Usage: &schema.TokenUsage{
+				PromptTokens:     11,
+				CompletionTokens: 7,
+				TotalTokens:      18,
+			},
+		},
+	})
+
+	var agent string
+	var total int
+	if err := db.QueryRowContext(ctx,
+		`SELECT agent, total_tokens FROM model_usage_logs WHERE run_id=?`,
+		runID,
+	).Scan(&agent, &total); err != nil {
+		t.Fatal(err)
+	}
+	if agent != "vision" || total != 18 {
+		t.Fatalf("agent=%q total=%d", agent, total)
+	}
 }
