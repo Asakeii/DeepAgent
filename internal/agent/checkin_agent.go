@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cloudwego/eino/compose"
+	einoagent "github.com/cloudwego/eino/flow/agent"
 	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
 
@@ -72,7 +73,12 @@ func RunCheckin(ctx context.Context, msgs []*schema.Message, threadID string) (*
 		_ = infra.AppendMessageForCheckin(ctx, threadID, string(m.Role), m.Content)
 	}
 
-	resp, err := agent.Generate(ctx, prompt)
+	audit := toolruntime.AuditContextFrom(ctx)
+	resp, err := agent.Generate(ctx, prompt, einoagent.WithComposeOptions(compose.WithCallbacks(&infra.LoggerCallback{
+		ID:     threadID,
+		RunID:  audit.RunID,
+		UserID: audit.UserID,
+	})))
 	if err != nil {
 		return nil, err
 	}

@@ -1,0 +1,4 @@
+- [x] Checkin ReAct agent 调用时挂载 Eino callback。
+- [x] callback 写入模型用量时保留 run/thread/user 维度。
+- [x] 补充 LoggerCallback 模型用量写入测试。
+- [ ] 后续：覆盖 VisionModel 直接调用。
