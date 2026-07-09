@@ -1,0 +1,9 @@
+- [x] 新增 suite A/B comparison 数据结构。
+- [x] 新增 baseline/candidate 对比算法。
+- [x] 识别 regressions、improvements 和 changed_scores。
+- [x] 新增 `cmd/evalcompare` 命令行工具。
+- [x] 支持回归数量和 pass rate delta 门禁。
+- [x] 补充比较算法单元测试。
+- [x] 更新 Agent eval 文档和成熟化路线图。
+- [ ] 后续：从线上 run events 自动导出 observations。
+- [ ] 后续：在线实验分桶和统计显著性。
