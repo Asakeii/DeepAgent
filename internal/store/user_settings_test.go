@@ -32,6 +32,7 @@ func TestUserSettingsLifecycleWithMySQL(t *testing.T) {
 		Timezone:                      "America/Los_Angeles",
 		MaxPlanIterations:             sql.NullInt64{Int64: 99, Valid: true},
 		MaxStepNum:                    sql.NullInt64{Int64: 0, Valid: true},
+		DailyTokenBudget:              sql.NullInt64{Int64: 500000, Valid: true},
 		EnableBackgroundInvestigation: sql.NullBool{Bool: true, Valid: true},
 		AutoAcceptPlan:                sql.NullBool{Bool: false, Valid: true},
 	}); err != nil {
@@ -47,6 +48,9 @@ func TestUserSettingsLifecycleWithMySQL(t *testing.T) {
 	}
 	if got.MaxPlanIterations.Int64 != 10 || got.MaxStepNum.Int64 != 1 {
 		t.Fatalf("settings should be clamped: %+v", got)
+	}
+	if !got.DailyTokenBudget.Valid || got.DailyTokenBudget.Int64 != 500000 {
+		t.Fatalf("daily_token_budget not persisted: %+v", got)
 	}
 	if !got.EnableBackgroundInvestigation.Valid || !got.EnableBackgroundInvestigation.Bool {
 		t.Fatalf("enable_background_investigation not persisted: %+v", got)

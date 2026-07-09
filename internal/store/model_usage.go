@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 )
 
 type ModelUsageRecord struct {
@@ -76,4 +77,22 @@ func AppendModelUsage(ctx context.Context, db *sql.DB, record ModelUsageRecord) 
 		return fmt.Errorf("append model usage: %w", err)
 	}
 	return nil
+}
+
+func SumUserModelTokensSince(ctx context.Context, db *sql.DB, userID string, since time.Time) (int64, error) {
+	if db == nil {
+		return 0, fmt.Errorf("db is nil")
+	}
+	userID = NormalizeUserID(userID)
+	var total int64
+	err := db.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(total_tokens), 0)
+		 FROM model_usage_logs
+		 WHERE user_id=? AND created_at>=?`,
+		userID, since,
+	).Scan(&total)
+	if err != nil {
+		return 0, fmt.Errorf("sum user model tokens: %w", err)
+	}
+	return total, nil
 }

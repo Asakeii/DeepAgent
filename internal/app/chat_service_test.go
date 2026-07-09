@@ -301,6 +301,76 @@ func TestChatServiceAppliesUserSettingsDefaults(t *testing.T) {
 	}
 }
 
+func TestChatServiceRejectsRunWhenDailyTokenBudgetExceeded(t *testing.T) {
+	db := appDBForTest(t)
+	if db == nil {
+		t.Skip("TEST_MYSQL_DSN not set")
+	}
+	prevDB := infra.DB
+	infra.DB = db
+	t.Cleanup(func() {
+		infra.DB = prevDB
+	})
+
+	suffix := time.Now().Format("20060102150405.000000000")
+	runID := "budget-run-" + suffix
+	threadID := "budget-thread-" + suffix
+	userID := "budget-user-" + suffix
+	usageRunID := "budget-usage-run-" + suffix
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM model_usage_logs WHERE user_id=?", userID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifact_citations WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifacts WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM run_events WHERE run_id=?", runID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM runs WHERE id=?", runID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM messages WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM memories WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM threads WHERE id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM user_settings WHERE user_id=?", userID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM users WHERE id=?", userID)
+	})
+	if err := store.UpsertUserSettings(context.Background(), db, store.UserSettingsRecord{
+		UserID:           userID,
+		DailyTokenBudget: sql.NullInt64{Int64: 1000, Valid: true},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AppendModelUsage(context.Background(), db, store.ModelUsageRecord{
+		RunID:       usageRunID,
+		ThreadID:    threadID,
+		UserID:      userID,
+		TotalTokens: 1000,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	research := &fakeResearchRunner{result: ResearchRunResult{Final: "should not run"}}
+	service := NewChatServiceWithDeps(research, &fakeCheckinRunner{}, fakeReminderStreamer{})
+	writer := NewCaptureWriter()
+	service.RunStream(context.Background(), model.ChatRequest{
+		RunID:    runID,
+		ThreadID: threadID,
+		UserID:   userID,
+		Messages: []*schema.Message{
+			schema.UserMessage("研究一个会触发预算拦截的任务"),
+		},
+	}, writer)
+
+	if research.called {
+		t.Fatal("research runner should not be called after token budget is exceeded")
+	}
+	if got := writer.FinalContent(); !strings.Contains(got, "今日模型 token 用量已达到预算") {
+		t.Fatalf("final content=%q, want token budget error", got)
+	}
+	run, err := store.GetRun(context.Background(), db, runID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Status != store.RunStatusFailed {
+		t.Fatalf("run status=%s, want %s", run.Status, store.RunStatusFailed)
+	}
+}
+
 func appDBForTest(t *testing.T) *sql.DB {
 	t.Helper()
 	dsn := os.Getenv("TEST_MYSQL_DSN")

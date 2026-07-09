@@ -1,0 +1,9 @@
+- [x] 为 `user_settings` 增加 `daily_token_budget` schema 和 migration。
+- [x] settings API 支持读取、更新和清空每日 token 预算。
+- [x] 新增用户当天 token 用量聚合 Store 方法。
+- [x] ChatService 在模型执行前拦截超预算 run。
+- [x] 超预算 run 写入持久化 error event 并标记 failed。
+- [x] 补充 store 和 ChatService 测试。
+- [ ] 后续：支持模型价格表和金额成本预算。
+- [ ] 后续：支持团队级预算和管理员设置。
+- [ ] 后续：运行中基于 streaming usage 做更细粒度熔断。

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 func TestAppendModelUsageWithMySQL(t *testing.T) {
@@ -40,5 +41,39 @@ func TestAppendModelUsageWithMySQL(t *testing.T) {
 	}
 	if total != 30 || cached != 3 || reasoning != 4 {
 		t.Fatalf("total=%d cached=%d reasoning=%d", total, cached, reasoning)
+	}
+}
+
+func TestSumUserModelTokensSinceWithMySQL(t *testing.T) {
+	db := DBForTest(t)
+	if db == nil {
+		t.Skip("mysql not available")
+	}
+	ctx := context.Background()
+	userID := "usage-sum-user-" + randomSuffix()
+	otherUserID := "usage-sum-other-" + randomSuffix()
+	runID1 := "usage-sum-run-1-" + randomSuffix()
+	runID2 := "usage-sum-run-2-" + randomSuffix()
+	otherRunID := "usage-sum-run-other-" + randomSuffix()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, "DELETE FROM model_usage_logs WHERE run_id IN (?, ?, ?)", runID1, runID2, otherRunID)
+	})
+
+	for _, record := range []ModelUsageRecord{
+		{RunID: runID1, ThreadID: "thread-1", UserID: userID, TotalTokens: 40},
+		{RunID: runID2, ThreadID: "thread-2", UserID: userID, PromptTokens: 20, CompletionTokens: 30},
+		{RunID: otherRunID, ThreadID: "thread-3", UserID: otherUserID, TotalTokens: 1000},
+	} {
+		if err := AppendModelUsage(ctx, db, record); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := SumUserModelTokensSince(ctx, db, userID, time.Now().Add(-time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 90 {
+		t.Fatalf("tokens=%d, want 90", got)
 	}
 }

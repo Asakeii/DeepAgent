@@ -201,6 +201,7 @@ type UserSettingsResp struct {
 	Timezone                      string `json:"timezone"`
 	MaxPlanIterations             *int   `json:"max_plan_iterations,omitempty"`
 	MaxStepNum                    *int   `json:"max_step_num,omitempty"`
+	DailyTokenBudget              *int   `json:"daily_token_budget,omitempty"`
 	EnableBackgroundInvestigation *bool  `json:"enable_background_investigation,omitempty"`
 	AutoAcceptPlan                *bool  `json:"auto_accept_plan,omitempty"`
 	UpdatedAt                     string `json:"updated_at,omitempty"`
@@ -211,6 +212,7 @@ type UpdateUserSettingsRequest struct {
 	Timezone                      *string `json:"timezone,omitempty"`
 	MaxPlanIterations             *int    `json:"max_plan_iterations,omitempty"`
 	MaxStepNum                    *int    `json:"max_step_num,omitempty"`
+	DailyTokenBudget              *int    `json:"daily_token_budget,omitempty"`
 	EnableBackgroundInvestigation *bool   `json:"enable_background_investigation,omitempty"`
 	AutoAcceptPlan                *bool   `json:"auto_accept_plan,omitempty"`
 }

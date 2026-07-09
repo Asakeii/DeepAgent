@@ -27,13 +27,13 @@ func firstUserMessage(req model.ChatRequest) string {
 	return ""
 }
 
-func applyUserSettingsDefaults(ctx context.Context, req *model.ChatRequest) error {
+func applyUserSettingsDefaults(ctx context.Context, req *model.ChatRequest) (store.UserSettingsRecord, error) {
 	if req == nil {
-		return nil
+		return store.UserSettingsRecord{}, nil
 	}
 	settings, err := store.GetUserSettings(ctx, infra.DB, req.UserID)
 	if err != nil {
-		return err
+		return store.UserSettingsRecord{}, err
 	}
 	if req.Locale == "" {
 		req.Locale = settings.Locale
@@ -48,7 +48,7 @@ func applyUserSettingsDefaults(ctx context.Context, req *model.ChatRequest) erro
 		v := settings.EnableBackgroundInvestigation.Bool
 		req.EnableBackgroundInvestigation = &v
 	}
-	return nil
+	return settings, nil
 }
 
 func requestLocale(req model.ChatRequest) string {

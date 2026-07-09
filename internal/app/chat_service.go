@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/cloudwego/eino/schema"
@@ -70,7 +71,8 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 		_ = writer.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "thread forbidden"})
 		return
 	}
-	if err := applyUserSettingsDefaults(ctx, &req); err != nil {
+	settings, err := applyUserSettingsDefaults(ctx, &req)
+	if err != nil {
 		runLog.ErrorContext(ctx, "apply user settings failed", slog.Any("error", err))
 	}
 	persistExplicitMemories(ctx, req.UserID, req.ThreadID, req.Messages)
@@ -117,6 +119,22 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 			slog.Int64("duration_ms", time.Since(startedAt).Milliseconds()),
 		)
 	}()
+	if exceeded, used, err := dailyTokenBudgetExceeded(ctx, req.UserID, settings); err != nil {
+		runLog.ErrorContext(ctx, "daily token budget check failed", slog.Any("error", err))
+		_ = runWriter.WriteEvent("error", &model.ChatResp{
+			Role:         "assistant",
+			Content:      "模型用量预算检查失败，请稍后重试",
+			FinishReason: "token_budget_check_failed",
+		})
+		return
+	} else if exceeded {
+		_ = runWriter.WriteEvent("error", &model.ChatResp{
+			Role:         "assistant",
+			Content:      tokenBudgetExceededMessage(used, settings.DailyTokenBudget.Int64),
+			FinishReason: "token_budget_exceeded",
+		})
+		return
+	}
 	if req.ImageBase64 != "" {
 		if err := validateImageInput(req.ImageBase64); err != nil {
 			_ = runWriter.WriteEvent("error", &model.ChatResp{
@@ -211,6 +229,37 @@ func writeRunTimedOut(writer EventWriter, runID, threadID string) {
 		Content:      "运行超时，请缩小任务范围或稍后重试",
 		FinishReason: "timeout",
 	})
+}
+
+func dailyTokenBudgetExceeded(ctx context.Context, userID string, settings store.UserSettingsRecord) (bool, int64, error) {
+	if !settings.DailyTokenBudget.Valid {
+		return false, 0, nil
+	}
+	used, err := store.SumUserModelTokensSince(ctx, infra.DB, userID, userDayStart(time.Now(), settings.Timezone))
+	if err != nil {
+		return false, 0, err
+	}
+	return used >= settings.DailyTokenBudget.Int64, used, nil
+}
+
+func userDayStart(now time.Time, timezone string) time.Time {
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		loc, _ = time.LoadLocation(store.DefaultTimezone)
+	}
+	if loc == nil {
+		loc = time.Local
+	}
+	local := now.In(loc)
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
+}
+
+func tokenBudgetExceededMessage(used, limit int64) string {
+	return "今日模型 token 用量已达到预算（已用 " + formatInt64(used) + " / 预算 " + formatInt64(limit) + "），请稍后再试或调整用户设置。"
+}
+
+func formatInt64(v int64) string {
+	return strconv.FormatInt(v, 10)
 }
 
 func persistResearchArtifact(ctx context.Context, req model.ChatRequest, final string) error {

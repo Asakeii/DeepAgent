@@ -70,6 +70,13 @@ func applyUserSettingsUpdate(record *store.UserSettingsRecord, req model.UpdateU
 	if req.MaxStepNum != nil {
 		record.MaxStepNum = sql.NullInt64{Int64: int64(*req.MaxStepNum), Valid: true}
 	}
+	if req.DailyTokenBudget != nil {
+		if *req.DailyTokenBudget <= 0 {
+			record.DailyTokenBudget = sql.NullInt64{}
+		} else {
+			record.DailyTokenBudget = sql.NullInt64{Int64: int64(*req.DailyTokenBudget), Valid: true}
+		}
+	}
 	if req.EnableBackgroundInvestigation != nil {
 		record.EnableBackgroundInvestigation = sql.NullBool{Bool: *req.EnableBackgroundInvestigation, Valid: true}
 	}
@@ -91,6 +98,10 @@ func userSettingsResp(record store.UserSettingsRecord) *model.UserSettingsResp {
 	if record.MaxStepNum.Valid {
 		v := int(record.MaxStepNum.Int64)
 		resp.MaxStepNum = &v
+	}
+	if record.DailyTokenBudget.Valid {
+		v := int(record.DailyTokenBudget.Int64)
+		resp.DailyTokenBudget = &v
 	}
 	if record.EnableBackgroundInvestigation.Valid {
 		v := record.EnableBackgroundInvestigation.Bool
