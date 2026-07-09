@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 
 	"deepAgent/conf"
+	"deepAgent/internal/store"
 )
 
 const (
@@ -153,13 +155,69 @@ type MCPToolInfo struct {
 	Description string
 }
 
-func ListMCPTools(ctx context.Context) ([]MCPToolInfo, error) {
+type PluginScope struct {
+	UserID string
+	TeamID string
+}
+
+type pluginScopeKey struct{}
+
+func WithPluginScope(ctx context.Context, scope PluginScope) context.Context {
+	scope.UserID = store.NormalizeUserID(scope.UserID)
+	scope.TeamID = strings.TrimSpace(scope.TeamID)
+	return context.WithValue(ctx, pluginScopeKey{}, scope)
+}
+
+func PluginScopeFrom(ctx context.Context) PluginScope {
+	if scope, ok := ctx.Value(pluginScopeKey{}).(PluginScope); ok {
+		return scope
+	}
+	return PluginScope{UserID: store.AnonymousUserID}
+}
+
+func MCPClientsForScope(ctx context.Context) map[string]client.MCPClient {
 	if len(MCPServer) == 0 {
+		return nil
+	}
+	if DB == nil {
+		return MCPServer
+	}
+	scope := PluginScopeFrom(ctx)
+	scopeType, scopeID := store.PluginScopeFor(scope.UserID, scope.TeamID)
+	enabled, err := store.EnabledPluginServers(ctx, DB, scopeType, scopeID, configuredMCPServerNames())
+	if err != nil {
+		log.Printf("plugin scope fallback: scope=%s:%s err=%v", scopeType, scopeID, err)
+		return MCPServer
+	}
+	out := make(map[string]client.MCPClient, len(enabled))
+	for name, cli := range MCPServer {
+		if enabled[name] {
+			out[name] = cli
+		}
+	}
+	return out
+}
+
+func configuredMCPServerNames() []string {
+	if conf.App == nil {
+		return nil
+	}
+	names := make([]string, 0, len(conf.App.MCP.Servers))
+	for name := range conf.App.MCP.Servers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func ListMCPTools(ctx context.Context) ([]MCPToolInfo, error) {
+	clients := MCPClientsForScope(ctx)
+	if len(clients) == 0 {
 		return nil, nil
 	}
 
 	toolInfos := []MCPToolInfo{}
-	for name, cli := range MCPServer {
+	for name, cli := range clients {
 		tools, err := einomcp.GetTools(ctx, &einomcp.Config{Cli: cli})
 		if err != nil {
 			return nil, fmt.Errorf("list mcp tools %s: %w", name, err)

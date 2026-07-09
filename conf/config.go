@@ -44,6 +44,13 @@ type MCPServerConfig struct {
 	Headers []string          `yaml:"headers,omitempty"`
 }
 
+func (c MCPServerConfig) Transport() string {
+	if c.URL != "" {
+		return "sse"
+	}
+	return "stdio"
+}
+
 // ModelEndpointConfig 描述一个 OpenAI-compatible 模型端点。
 type ModelEndpointConfig struct {
 	DefaultModel string `yaml:"default_model"`

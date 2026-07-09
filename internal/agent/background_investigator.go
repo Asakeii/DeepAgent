@@ -53,7 +53,7 @@ func findSearchTool(ctx context.Context) (tool.InvokableTool, error) {
 		}
 	}
 
-	for _, cli := range infra.MCPServer {
+	for _, cli := range infra.MCPClientsForScope(ctx) {
 		tools, err := einomcp.GetTools(ctx, &einomcp.Config{Cli: cli})
 		if err != nil {
 			continue

@@ -315,6 +315,43 @@ type ListTeamMembersResponse struct {
 	Members []*TeamMemberResp `json:"members"`
 }
 
+type PluginToolResp struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+}
+
+type PluginResp struct {
+	Server    string            `json:"server"`
+	Transport string            `json:"transport"`
+	Enabled   bool              `json:"enabled"`
+	Tools     []*PluginToolResp `json:"tools,omitempty"`
+}
+
+type ListPluginsResponse struct {
+	ScopeType string        `json:"scope_type"`
+	ScopeID   string        `json:"scope_id"`
+	Plugins   []*PluginResp `json:"plugins"`
+}
+
+type UpdatePluginInstallRequest struct {
+	TeamID  string `json:"team_id,omitempty"`
+	Server  string `json:"server"`
+	Enabled bool   `json:"enabled"`
+}
+
+type PluginInstallResp struct {
+	ScopeType string `json:"scope_type"`
+	ScopeID   string `json:"scope_id"`
+	Server    string `json:"server"`
+	Enabled   bool   `json:"enabled"`
+	UpdatedBy string `json:"updated_by,omitempty"`
+	UpdatedAt string `json:"updated_at,omitempty"`
+}
+
+type PluginInstallResponse struct {
+	Install *PluginInstallResp `json:"install"`
+}
+
 // ChatResp 是 SSE 事件里返回给前端的统一消息结构。
 type ChatResp struct {
 	RunID          string           `json:"run_id,omitempty"`

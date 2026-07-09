@@ -37,6 +37,7 @@ func DBForTest(t *testing.T) *sql.DB {
 	_ = EnsureCitationTables(context.Background(), db)
 	_ = EnsureUserSettingsTables(context.Background(), db)
 	_ = EnsureModelUsageTables(context.Background(), db)
+	_ = EnsurePluginTables(context.Background(), db)
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS runs (
         id VARCHAR(128) NOT NULL PRIMARY KEY,
         user_id VARCHAR(128) NOT NULL DEFAULT '',

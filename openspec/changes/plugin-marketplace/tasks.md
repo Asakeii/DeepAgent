@@ -1,0 +1,10 @@
+- [x] 新增 `plugin_installs` 共享存储和迁移。
+- [x] 新增插件启用状态 Store。
+- [x] 新增 `/api/plugins` 插件目录接口。
+- [x] 新增 `/api/plugin-installs` 启用/禁用接口。
+- [x] 团队插件安装操作要求 owner/admin。
+- [x] Chat run 注入用户/团队 plugin scope。
+- [x] Coder 与 Background Investigator 按 plugin scope 过滤 MCP tools。
+- [x] 补充 Store 层插件启用状态测试。
+- [ ] 后续：前端插件市场页面。
+- [ ] 后续：插件版本、评分、OAuth 授权和插件级审计。

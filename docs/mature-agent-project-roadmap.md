@@ -516,7 +516,7 @@ AppendMessage:
 - [x] 团队空间（后端 team/team_members、团队 thread 与共享 artifact 访问已支持；前端切换和团队预算待补）。
 - [x] 管理后台（后端 overview API 与前端概览页已支持）。
 - [x] A/B eval。
-- [ ] 插件市场。
+- [x] 插件市场（后端 MCP 插件目录、用户/团队启用状态和运行时过滤已支持；前端市场页、版本和授权待补）。
 
 ## 8. 建议的成熟架构形态
 

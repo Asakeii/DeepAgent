@@ -164,7 +164,7 @@ func NewCoder[I, O any](ctx context.Context) *compose.Graph[I, O] {
 	// 只挂载名字以 python 开头的 MCP server 的 tools，与 Researcher 的搜索 tools 隔离
 	coderTools := []tool.BaseTool{}
 
-	for name, cli := range infra.MCPServer {
+	for name, cli := range infra.MCPClientsForScope(ctx) {
 		if !strings.HasPrefix(name, "python") {
 			continue
 		}

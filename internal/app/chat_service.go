@@ -113,6 +113,7 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 		ThreadID: req.ThreadID,
 		UserID:   req.UserID,
 	})
+	toolCtx = infra.WithPluginScope(toolCtx, infra.PluginScope{UserID: req.UserID, TeamID: req.TeamID})
 	defer func() {
 		status := store.RunStatusSucceeded
 		errText := ""

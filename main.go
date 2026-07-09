@@ -199,6 +199,8 @@ func runServer() {
 	mux.HandleFunc("/api/admin/overview", handler.AdminOverview)
 	mux.HandleFunc("/api/teams", handler.Teams)
 	mux.HandleFunc("/api/team-members", handler.TeamMembers)
+	mux.HandleFunc("/api/plugins", handler.Plugins)
+	mux.HandleFunc("/api/plugin-installs", handler.PluginInstalls)
 	mux.HandleFunc("/api/memories", handler.Memories)
 	mux.HandleFunc("/api/artifacts", handler.ListArtifacts)
 	mux.HandleFunc("/api/artifact-exports", handler.ExportArtifact)
