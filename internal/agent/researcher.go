@@ -27,7 +27,7 @@ func RunResearcher(ctx context.Context, state *model.State) error {
 		return err
 	}
 
-	resp, err := infra.ChatModel.Generate(ctx, messages)
+	resp, err := infra.ChatModelFor(ctx).Generate(ctx, messages)
 	if err != nil {
 		return fmt.Errorf("call researcher model: %w", err)
 	}
@@ -148,7 +148,7 @@ func NewResearcher[I, O any](ctx context.Context) *compose.Graph[I, O] {
 	// ReAct Agent 会在“模型思考 -> 工具调用 -> 观察结果”之间循环，直到得到最终回答或达到 MaxStep。
 	agent, err := react.NewAgent(ctx, &react.AgentConfig{
 		MaxStep:               40,
-		ToolCallingModel:      infra.ChatModel,
+		ToolCallingModel:      infra.ChatModelFor(ctx),
 		ToolsConfig:           compose.ToolsNodeConfig{Tools: researchTools},
 		MessageModifier:       modifyResearcherInput,
 		StreamToolCallChecker: toolCallChecker,

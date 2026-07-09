@@ -137,9 +137,10 @@ func NewCoordinator[I, O any](ctx context.Context) *compose.Graph[I, O] {
 	}
 
 	// 给 Coordinator 绑定两个路由工具
-	coordinatorModel, err := infra.ChatModel.WithTools([]*schema.ToolInfo{handToPlanner, handToCheckin})
+	chatModel := infra.ChatModelFor(ctx)
+	coordinatorModel, err := chatModel.WithTools([]*schema.ToolInfo{handToPlanner, handToCheckin})
 	if err != nil {
-		coordinatorModel = infra.ChatModel
+		coordinatorModel = chatModel
 	}
 
 	return buildLoadAgentRouter(

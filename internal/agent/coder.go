@@ -30,7 +30,7 @@ func RunCoder(ctx context.Context, state *model.State) error {
 	}
 
 	// 简化版：单次 ChatModel 调用，不接 MCP tool
-	resp, err := infra.ChatModel.Generate(ctx, messages)
+	resp, err := infra.ChatModelFor(ctx).Generate(ctx, messages)
 	if err != nil {
 		return fmt.Errorf("call coder model: %w", err)
 	}
@@ -182,7 +182,7 @@ func NewCoder[I, O any](ctx context.Context) *compose.Graph[I, O] {
 	// ReAct Agent：模型 ↔ tool call 可多轮循环，最多 MaxStep 轮
 	agent, err := react.NewAgent(ctx, &react.AgentConfig{
 		MaxStep:               40,
-		ToolCallingModel:      infra.ChatModel,
+		ToolCallingModel:      infra.ChatModelFor(ctx),
 		ToolsConfig:           compose.ToolsNodeConfig{Tools: coderTools},
 		MessageModifier:       modifyCoderInput,
 		StreamToolCallChecker: toolCallChecker,

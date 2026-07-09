@@ -19,6 +19,13 @@ model:
     default_model: "vm"
     api_key: "vk"
     base_url: "vu"
+  profiles:
+    FAST:
+      default_model: "fast-model"
+    deep:
+      default_model: "deep-model"
+      api_key: "dk"
+      base_url: "du"
 setting:
   max_step_num: 3
   run_timeout_seconds: 120
@@ -53,6 +60,9 @@ server:
 	}
 	if cfg.Model.VisionModel == nil || cfg.Model.VisionModel.DefaultModel != "vm" {
 		t.Fatalf("vision model not parsed: %+v", cfg.Model.VisionModel)
+	}
+	if len(cfg.Model.Profiles) != 2 || cfg.Model.Profiles["FAST"].DefaultModel != "fast-model" || cfg.Model.Profiles["deep"].BaseURL != "du" {
+		t.Fatalf("model profiles not parsed: %+v", cfg.Model.Profiles)
 	}
 	if cfg.Setting.RunTimeoutSeconds != 120 {
 		t.Fatalf("run timeout not parsed: %+v", cfg.Setting)

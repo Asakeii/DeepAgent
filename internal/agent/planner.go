@@ -25,7 +25,7 @@ func RunPlanner(ctx context.Context, state *model.State) error {
 		return err
 	}
 
-	resp, err := infra.PlanModel.Generate(ctx, messages)
+	resp, err := infra.PlanModelFor(ctx).Generate(ctx, messages)
 	if err != nil {
 		return fmt.Errorf("call plan model: %w", err)
 	}
@@ -156,7 +156,7 @@ func routerPlanner(ctx context.Context, input *schema.Message, opts ...any) (out
 func NewPlanner[I, O any](ctx context.Context) *compose.Graph[I, O] {
 	return buildLoadAgentRouter(
 		compose.InvokableLambdaWithOption(loadPlannerMsg),
-		withChatModel[I, O](infra.PlanModel),
+		withChatModel[I, O](infra.PlanModelFor(ctx)),
 		compose.InvokableLambdaWithOption(routerPlanner),
 	)
 }

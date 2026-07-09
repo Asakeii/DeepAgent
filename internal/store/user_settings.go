@@ -17,6 +17,7 @@ type UserSettingsRecord struct {
 	UserID                        string
 	Locale                        string
 	Timezone                      string
+	ModelProfile                  string
 	MaxPlanIterations             sql.NullInt64
 	MaxStepNum                    sql.NullInt64
 	DailyTokenBudget              sql.NullInt64
@@ -33,6 +34,7 @@ func EnsureUserSettingsTables(ctx context.Context, db *sql.DB) error {
 		user_id                         VARCHAR(128) NOT NULL PRIMARY KEY,
 		locale                          VARCHAR(32) NOT NULL DEFAULT 'zh-CN',
 		timezone                        VARCHAR(64) NOT NULL DEFAULT 'Asia/Shanghai',
+		model_profile                   VARCHAR(64) NOT NULL DEFAULT '',
 		max_plan_iterations             INT NULL,
 		max_step_num                    INT NULL,
 		daily_token_budget              INT NULL,
@@ -60,11 +62,11 @@ func GetUserSettings(ctx context.Context, db *sql.DB, userID string) (UserSettin
 	}
 	record := DefaultUserSettings(userID)
 	err := db.QueryRowContext(ctx,
-		`SELECT user_id, locale, timezone, max_plan_iterations, max_step_num,
+		`SELECT user_id, locale, timezone, model_profile, max_plan_iterations, max_step_num,
 		 daily_token_budget, enable_background_investigation, auto_accept_plan, updated_at
 		 FROM user_settings WHERE user_id=?`,
 		record.UserID,
-	).Scan(&record.UserID, &record.Locale, &record.Timezone, &record.MaxPlanIterations, &record.MaxStepNum, &record.DailyTokenBudget, &record.EnableBackgroundInvestigation, &record.AutoAcceptPlan, &record.UpdatedAt)
+	).Scan(&record.UserID, &record.Locale, &record.Timezone, &record.ModelProfile, &record.MaxPlanIterations, &record.MaxStepNum, &record.DailyTokenBudget, &record.EnableBackgroundInvestigation, &record.AutoAcceptPlan, &record.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return record, nil
 	}
@@ -85,17 +87,18 @@ func UpsertUserSettings(ctx context.Context, db *sql.DB, record UserSettingsReco
 	}
 	_, err := db.ExecContext(ctx,
 		`INSERT INTO user_settings
-		 (user_id, locale, timezone, max_plan_iterations, max_step_num, daily_token_budget, enable_background_investigation, auto_accept_plan)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		 (user_id, locale, timezone, model_profile, max_plan_iterations, max_step_num, daily_token_budget, enable_background_investigation, auto_accept_plan)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON DUPLICATE KEY UPDATE
 		 locale=VALUES(locale),
 		 timezone=VALUES(timezone),
+		 model_profile=VALUES(model_profile),
 		 max_plan_iterations=VALUES(max_plan_iterations),
 		 max_step_num=VALUES(max_step_num),
 		 daily_token_budget=VALUES(daily_token_budget),
 		 enable_background_investigation=VALUES(enable_background_investigation),
 		 auto_accept_plan=VALUES(auto_accept_plan)`,
-		record.UserID, record.Locale, record.Timezone, record.MaxPlanIterations, record.MaxStepNum, record.DailyTokenBudget, record.EnableBackgroundInvestigation, record.AutoAcceptPlan,
+		record.UserID, record.Locale, record.Timezone, record.ModelProfile, record.MaxPlanIterations, record.MaxStepNum, record.DailyTokenBudget, record.EnableBackgroundInvestigation, record.AutoAcceptPlan,
 	)
 	if err != nil {
 		return fmt.Errorf("upsert user settings: %w", err)
@@ -118,6 +121,10 @@ func normalizeUserSettings(record *UserSettingsRecord) {
 	}
 	if len(record.Timezone) > 64 {
 		record.Timezone = record.Timezone[:64]
+	}
+	record.ModelProfile = strings.ToLower(strings.TrimSpace(record.ModelProfile))
+	if len(record.ModelProfile) > 64 {
+		record.ModelProfile = record.ModelProfile[:64]
 	}
 	record.MaxPlanIterations = normalizeNullableInt(record.MaxPlanIterations, 1, 10)
 	record.MaxStepNum = normalizeNullableInt(record.MaxStepNum, 1, 20)

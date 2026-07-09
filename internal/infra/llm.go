@@ -3,6 +3,7 @@ package infra
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	modelopenai "github.com/cloudwego/eino-ext/components/model/openai"
 	openaiacl "github.com/cloudwego/eino-ext/libs/acl/openai"
@@ -13,15 +14,27 @@ import (
 )
 
 var (
-	// ChatModel 通用对话模型，供 Coordinator、Researcher、Reporter 等节点使用
+	// ChatModel 通用对话模型，供 Coordinator、Researcher、Reporter 等节点使用。
 	ChatModel *modelopenai.ChatModel
-	// PlanModel 结构化输出模型，强制 Planner 按 model.Plan JSON Schema 返回
+	// PlanModel 结构化输出模型，强制 Planner 按 model.Plan JSON Schema 返回。
 	PlanModel *modelopenai.ChatModel
 	// VisionModel 多模态视觉模型，供识图 agent 使用。未单独配置时回退主 ChatModel。
 	VisionModel *modelopenai.ChatModel
+
+	defaultModels *ModelBundle
+	modelProfiles map[string]*ModelBundle
 )
 
-// InitModel 根据配置初始化 ChatModel 与 PlanModel。
+type modelProfileContextKey struct{}
+
+type ModelBundle struct {
+	Profile string
+	Chat    *modelopenai.ChatModel
+	Plan    *modelopenai.ChatModel
+	Vision  *modelopenai.ChatModel
+}
+
+// InitModel 根据配置初始化默认模型和命名模型 profile。
 func InitModel(ctx context.Context) error {
 	if conf.App == nil {
 		return fmt.Errorf("config is not loaded")
@@ -38,24 +51,59 @@ func InitModel(ctx context.Context) error {
 		return fmt.Errorf("model.base_url is empty")
 	}
 
-	// 普通 Chat Completion（开启推理，豆包 Seed 2.0 支持 thinking）
+	base := conf.ModelEndpointConfig{
+		DefaultModel: cfg.DefaultModel,
+		APIKey:       cfg.APIKey,
+		BaseURL:      cfg.BaseURL,
+	}
+	bundle, err := newModelBundle(ctx, "", base, cfg.VisionModel)
+	if err != nil {
+		return err
+	}
+	defaultModels = bundle
+	modelProfiles = map[string]*ModelBundle{}
+	for name, profile := range cfg.Profiles {
+		name = NormalizeModelProfile(name)
+		if name == "" {
+			continue
+		}
+		endpoint := conf.ModelEndpointConfig{
+			DefaultModel: strings.TrimSpace(profile.DefaultModel),
+			APIKey:       firstNonEmpty(profile.APIKey, cfg.APIKey),
+			BaseURL:      firstNonEmpty(profile.BaseURL, cfg.BaseURL),
+		}
+		if endpoint.DefaultModel == "" {
+			return fmt.Errorf("model.profiles.%s.default_model is empty", name)
+		}
+		profileBundle, err := newModelBundle(ctx, name, endpoint, nil)
+		if err != nil {
+			return err
+		}
+		modelProfiles[name] = profileBundle
+	}
+
+	ChatModel = bundle.Chat
+	PlanModel = bundle.Plan
+	VisionModel = bundle.Vision
+	return nil
+}
+
+func newModelBundle(ctx context.Context, profile string, endpoint conf.ModelEndpointConfig, vision *conf.ModelEndpointConfig) (*ModelBundle, error) {
 	chatModel, err := modelopenai.NewChatModel(ctx, &modelopenai.ChatModelConfig{
-		BaseURL:         cfg.BaseURL,
-		APIKey:          cfg.APIKey,
-		Model:           cfg.DefaultModel,
+		BaseURL:         endpoint.BaseURL,
+		APIKey:          endpoint.APIKey,
+		Model:           endpoint.DefaultModel,
 		ReasoningEffort: modelopenai.ReasoningEffortLevelMedium,
 	})
 	if err != nil {
-		return fmt.Errorf("init chat model: %w", err)
+		return nil, fmt.Errorf("init chat model %q: %w", profile, err)
 	}
-	ChatModel = chatModel
 
-	// 从 model.Plan 反射 JSON Schema，供 Planner 输出结构化计划
 	planSchema := jsonschema.Reflect(&model.Plan{})
 	planModel, err := modelopenai.NewChatModel(ctx, &modelopenai.ChatModelConfig{
-		BaseURL: cfg.BaseURL,
-		APIKey:  cfg.APIKey,
-		Model:   cfg.DefaultModel,
+		BaseURL: endpoint.BaseURL,
+		APIKey:  endpoint.APIKey,
+		Model:   endpoint.DefaultModel,
 		ResponseFormat: &openaiacl.ChatCompletionResponseFormat{
 			Type: openaiacl.ChatCompletionResponseFormatTypeJSONSchema,
 			JSONSchema: &openaiacl.ChatCompletionResponseFormatJSONSchema{
@@ -66,33 +114,82 @@ func InitModel(ctx context.Context) error {
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("init plan model: %w", err)
+		return nil, fmt.Errorf("init plan model %q: %w", profile, err)
 	}
-	PlanModel = planModel
 
-	// VisionModel：如果配了 vision_model 段，用它；否则回退主 ChatModel。
-	if vcfg := cfg.VisionModel; vcfg != nil && vcfg.DefaultModel != "" {
-		apiKey := vcfg.APIKey
-		if apiKey == "" {
-			apiKey = cfg.APIKey // 回退主模型的 key
-		}
-		baseURL := vcfg.BaseURL
-		if baseURL == "" {
-			baseURL = cfg.BaseURL
-		}
+	visionModel := chatModel
+	if vision != nil && strings.TrimSpace(vision.DefaultModel) != "" {
 		vm, err := modelopenai.NewChatModel(ctx, &modelopenai.ChatModelConfig{
-			BaseURL: baseURL,
-			APIKey:  apiKey,
-			Model:   vcfg.DefaultModel,
+			BaseURL: firstNonEmpty(vision.BaseURL, endpoint.BaseURL),
+			APIKey:  firstNonEmpty(vision.APIKey, endpoint.APIKey),
+			Model:   strings.TrimSpace(vision.DefaultModel),
 		})
 		if err != nil {
-			return fmt.Errorf("init vision model: %w", err)
+			return nil, fmt.Errorf("init vision model %q: %w", profile, err)
 		}
-		VisionModel = vm
-	} else {
-		// 回退：复用主 ChatModel
-		VisionModel = chatModel
+		visionModel = vm
 	}
 
-	return nil
+	return &ModelBundle{Profile: profile, Chat: chatModel, Plan: planModel, Vision: visionModel}, nil
+}
+
+func WithModelProfile(ctx context.Context, profile string) context.Context {
+	profile = NormalizeModelProfile(profile)
+	if profile == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, modelProfileContextKey{}, profile)
+}
+
+func NormalizeModelProfile(profile string) string {
+	return strings.ToLower(strings.TrimSpace(profile))
+}
+
+func HasModelProfile(profile string) bool {
+	profile = NormalizeModelProfile(profile)
+	if profile == "" {
+		return true
+	}
+	_, ok := modelProfiles[profile]
+	return ok
+}
+
+func ActiveModelProfile(ctx context.Context) string {
+	profile, _ := ctx.Value(modelProfileContextKey{}).(string)
+	if HasModelProfile(profile) {
+		return NormalizeModelProfile(profile)
+	}
+	return ""
+}
+
+func ChatModelFor(ctx context.Context) *modelopenai.ChatModel {
+	return modelBundleFor(ctx).Chat
+}
+
+func PlanModelFor(ctx context.Context) *modelopenai.ChatModel {
+	return modelBundleFor(ctx).Plan
+}
+
+func VisionModelFor(ctx context.Context) *modelopenai.ChatModel {
+	return modelBundleFor(ctx).Vision
+}
+
+func modelBundleFor(ctx context.Context) *ModelBundle {
+	profile, _ := ctx.Value(modelProfileContextKey{}).(string)
+	if bundle, ok := modelProfiles[NormalizeModelProfile(profile)]; ok {
+		return bundle
+	}
+	if defaultModels != nil {
+		return defaultModels
+	}
+	return &ModelBundle{Chat: ChatModel, Plan: PlanModel, Vision: VisionModel}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }

@@ -38,6 +38,9 @@ func applyUserSettingsDefaults(ctx context.Context, req *model.ChatRequest) (sto
 	if req.Locale == "" {
 		req.Locale = settings.Locale
 	}
+	if req.ModelProfile == "" {
+		req.ModelProfile = settings.ModelProfile
+	}
 	if req.MaxPlanIterations <= 0 && settings.MaxPlanIterations.Valid {
 		req.MaxPlanIterations = int(settings.MaxPlanIterations.Int64)
 	}

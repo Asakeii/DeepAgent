@@ -44,13 +44,22 @@ type MCPServerConfig struct {
 	Headers []string          `yaml:"headers,omitempty"`
 }
 
+// ModelEndpointConfig 描述一个 OpenAI-compatible 模型端点。
+type ModelEndpointConfig struct {
+	DefaultModel string `yaml:"default_model"`
+	APIKey       string `yaml:"api_key"`
+	BaseURL      string `yaml:"base_url"`
+}
+
 // ModelConfig 描述 OpenAI-compatible chat completion 服务配置。
-// VisionModel 为识图 agent 专用模型，未配置时为 nil，后续识图阶段回退主讲模型。
+// VisionModel 为识图 agent 专用模型，未配置时回退主 ChatModel。
+// Profiles 用于多模型路由：请求或用户设置可选择一个命名 profile。
 type ModelConfig struct {
-	DefaultModel string       `yaml:"default_model"`
-	APIKey       string       `yaml:"api_key"`
-	BaseURL      string       `yaml:"base_url"`
-	VisionModel  *ModelConfig `yaml:"vision_model,omitempty"`
+	DefaultModel string                         `yaml:"default_model"`
+	APIKey       string                         `yaml:"api_key"`
+	BaseURL      string                         `yaml:"base_url"`
+	VisionModel  *ModelEndpointConfig           `yaml:"vision_model,omitempty"`
+	Profiles     map[string]ModelEndpointConfig `yaml:"profiles,omitempty"`
 }
 
 // SettingConfig 是 Agent 工作流运行时参数。

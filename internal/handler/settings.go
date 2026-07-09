@@ -44,6 +44,10 @@ func updateUserSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	applyUserSettingsUpdate(&record, req)
+	if record.ModelProfile != "" && !infra.HasModelProfile(record.ModelProfile) {
+		http.Error(w, "unknown model_profile", http.StatusBadRequest)
+		return
+	}
 	if err := store.UpsertUserSettings(r.Context(), infra.DB, record); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -63,6 +67,9 @@ func applyUserSettingsUpdate(record *store.UserSettingsRecord, req model.UpdateU
 	}
 	if req.Timezone != nil {
 		record.Timezone = *req.Timezone
+	}
+	if req.ModelProfile != nil {
+		record.ModelProfile = *req.ModelProfile
 	}
 	if req.MaxPlanIterations != nil {
 		record.MaxPlanIterations = sql.NullInt64{Int64: int64(*req.MaxPlanIterations), Valid: true}
@@ -87,9 +94,10 @@ func applyUserSettingsUpdate(record *store.UserSettingsRecord, req model.UpdateU
 
 func userSettingsResp(record store.UserSettingsRecord) *model.UserSettingsResp {
 	resp := &model.UserSettingsResp{
-		UserID:   record.UserID,
-		Locale:   record.Locale,
-		Timezone: record.Timezone,
+		UserID:       record.UserID,
+		Locale:       record.Locale,
+		Timezone:     record.Timezone,
+		ModelProfile: record.ModelProfile,
 	}
 	if record.MaxPlanIterations.Valid {
 		v := int(record.MaxPlanIterations.Int64)

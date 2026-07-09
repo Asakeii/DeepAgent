@@ -96,6 +96,16 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 	runCtx, stopRunTimeout := withRunTimeout(runCtx)
 	defer stopRunTimeout()
 	runWriter := NewRunEventWriter(infra.DB, req.RunID, req.ThreadID, req.UserID, writer)
+	req.ModelProfile = infra.NormalizeModelProfile(req.ModelProfile)
+	if !infra.HasModelProfile(req.ModelProfile) {
+		_ = runWriter.WriteEvent("error", &model.ChatResp{
+			Role:         "assistant",
+			Content:      "未知模型配置: " + req.ModelProfile,
+			FinishReason: "invalid_model_profile",
+		})
+		return
+	}
+	runCtx = infra.WithModelProfile(runCtx, req.ModelProfile)
 	toolCtx := toolruntime.WithAuditContext(runCtx, toolruntime.AuditContext{
 		RunID:    req.RunID,
 		ThreadID: req.ThreadID,

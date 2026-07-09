@@ -31,6 +31,16 @@ model:
     default_model: "<your vision model>"
     api_key: "ark-xxxxx"
     base_url: "https://ark.cn-beijing.volces.com/api/v3"
+  # Optional named model profiles. Request body or user settings can select
+  # one with model_profile, for example "fast" or "deep".
+  profiles:
+    fast:
+      default_model: "<your fast model>"
+      # api_key/base_url are optional; missing values inherit from model.api_key/base_url.
+    deep:
+      default_model: "<your stronger model>"
+      api_key: "ark-xxxxx"
+      base_url: "https://ark.cn-beijing.volces.com/api/v3"
 
 setting:
   max_plan_iterations: 1

@@ -18,11 +18,11 @@ import (
 )
 
 // NewCheckinAgent 构造一个独立的 ReAct checkin agent（不入总图，直接 agent.Generate 调用）。
-// agent 使用 infra.ChatModel + 打卡工具集；MessageModifier 在调用前注入 system prompt。
+// agent 使用当前请求选择的 ChatModel + 打卡工具集；MessageModifier 在调用前注入 system prompt。
 // threadID 通过 context.WithValue(tool.CtxKeyThreadID, tid) 在调用 agent.Generate 时传入。
 func NewCheckinAgent(ctx context.Context, threadID string) (*react.Agent, error) {
 	useScheduler := infra.RDB != nil
-	tools, err := tool.CheckinToolsWithOptions(ctx, infra.DB, infra.VisionModel, threadID, !useScheduler)
+	tools, err := tool.CheckinToolsWithOptions(ctx, infra.DB, infra.VisionModelFor(ctx), threadID, !useScheduler)
 	if err != nil {
 		return nil, fmt.Errorf("build checkin tools: %w", err)
 	}
@@ -40,7 +40,7 @@ func NewCheckinAgent(ctx context.Context, threadID string) (*react.Agent, error)
 
 	agent, err := react.NewAgent(ctx, &react.AgentConfig{
 		MaxStep:               40,
-		ToolCallingModel:      infra.ChatModel,
+		ToolCallingModel:      infra.ChatModelFor(ctx),
 		ToolsConfig:           compose.ToolsNodeConfig{Tools: tools},
 		MessageModifier:       checkinMessageModifier,
 		StreamToolCallChecker: toolCallChecker, // 复用 researcher/coder 里已有的 checker
@@ -90,7 +90,7 @@ func RunCheckin(ctx context.Context, msgs []*schema.Message, threadID string) (*
 
 // AnalyzeFoodImage 直接调用 VisionModel 分析食物图片，不走 ReAct agent。
 func AnalyzeFoodImage(ctx context.Context, imageB64, text, threadID string) (string, error) {
-	return tool.AnalyzeFoodDirect(ctx, imageB64, text, threadID, infra.DB, infra.VisionModel)
+	return tool.AnalyzeFoodDirect(ctx, imageB64, text, threadID, infra.DB, infra.VisionModelFor(ctx))
 }
 
 // checkinMessageModifier 在每次模型调用前注入 system prompt。

@@ -11,6 +11,7 @@ type ChatRequest struct {
 	RunID                         string            `json:"run_id,omitempty"`
 	ThreadID                      string            `json:"thread_id,omitempty"`
 	Locale                        string            `json:"locale,omitempty"`
+	ModelProfile                  string            `json:"model_profile,omitempty"`
 	MaxPlanIterations             int               `json:"max_plan_iterations,omitempty"`
 	MaxStepNum                    int               `json:"max_step_num,omitempty"`
 	AutoAcceptedPlan              bool              `json:"auto_accepted_plan,omitempty"`
@@ -226,6 +227,7 @@ type UserSettingsResp struct {
 	UserID                        string `json:"user_id,omitempty"`
 	Locale                        string `json:"locale"`
 	Timezone                      string `json:"timezone"`
+	ModelProfile                  string `json:"model_profile,omitempty"`
 	MaxPlanIterations             *int   `json:"max_plan_iterations,omitempty"`
 	MaxStepNum                    *int   `json:"max_step_num,omitempty"`
 	DailyTokenBudget              *int   `json:"daily_token_budget,omitempty"`
@@ -237,6 +239,7 @@ type UserSettingsResp struct {
 type UpdateUserSettingsRequest struct {
 	Locale                        *string `json:"locale,omitempty"`
 	Timezone                      *string `json:"timezone,omitempty"`
+	ModelProfile                  *string `json:"model_profile,omitempty"`
 	MaxPlanIterations             *int    `json:"max_plan_iterations,omitempty"`
 	MaxStepNum                    *int    `json:"max_step_num,omitempty"`
 	DailyTokenBudget              *int    `json:"daily_token_budget,omitempty"`

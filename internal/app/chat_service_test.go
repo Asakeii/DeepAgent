@@ -371,6 +371,60 @@ func TestChatServiceRejectsRunWhenDailyTokenBudgetExceeded(t *testing.T) {
 	}
 }
 
+func TestChatServiceRejectsUnknownModelProfileBeforeRunner(t *testing.T) {
+	db := appDBForTest(t)
+	if db == nil {
+		t.Skip("TEST_MYSQL_DSN not set")
+	}
+	prevDB := infra.DB
+	infra.DB = db
+	t.Cleanup(func() {
+		infra.DB = prevDB
+	})
+
+	suffix := time.Now().Format("20060102150405.000000000")
+	runID := "model-profile-run-" + suffix
+	threadID := "model-profile-thread-" + suffix
+	userID := "model-profile-user-" + suffix
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifact_citations WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM artifacts WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM run_events WHERE run_id=?", runID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM runs WHERE id=?", runID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM messages WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM memories WHERE thread_id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM threads WHERE id=?", threadID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM users WHERE id=?", userID)
+	})
+
+	research := &fakeResearchRunner{result: ResearchRunResult{Final: "should not run"}}
+	service := NewChatServiceWithDeps(research, &fakeCheckinRunner{}, fakeReminderStreamer{})
+	writer := NewCaptureWriter()
+	service.RunStream(context.Background(), model.ChatRequest{
+		RunID:        runID,
+		ThreadID:     threadID,
+		UserID:       userID,
+		ModelProfile: "missing-profile",
+		Messages: []*schema.Message{
+			schema.UserMessage("研究模型路由"),
+		},
+	}, writer)
+
+	if research.called {
+		t.Fatal("research runner should not be called for unknown model profile")
+	}
+	if got := writer.FinalContent(); !strings.Contains(got, "未知模型配置") {
+		t.Fatalf("final content=%q, want model profile error", got)
+	}
+	run, err := store.GetRun(context.Background(), db, runID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Status != store.RunStatusFailed {
+		t.Fatalf("run status=%s, want %s", run.Status, store.RunStatusFailed)
+	}
+}
+
 func appDBForTest(t *testing.T) *sql.DB {
 	t.Helper()
 	dsn := os.Getenv("TEST_MYSQL_DSN")

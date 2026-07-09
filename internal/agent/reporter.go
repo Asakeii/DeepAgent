@@ -22,7 +22,7 @@ func RunReporter(ctx context.Context, state *model.State) (string, error) {
 		return "", err
 	}
 
-	resp, err := infra.ChatModel.Generate(ctx, messages)
+	resp, err := infra.ChatModelFor(ctx).Generate(ctx, messages)
 	if err != nil {
 		return "", fmt.Errorf("call reporter model: %w", err)
 	}
@@ -108,7 +108,7 @@ func routerReporter(ctx context.Context, input *schema.Message, opts ...any) (ou
 func NewReporter[I, O any](ctx context.Context) *compose.Graph[I, O] {
 	return buildLoadAgentRouter(
 		compose.InvokableLambdaWithOption(loadReporterMsg),
-		withChatModel[I, O](infra.ChatModel),
+		withChatModel[I, O](infra.ChatModelFor(ctx)),
 		compose.InvokableLambdaWithOption(routerReporter),
 	)
 }

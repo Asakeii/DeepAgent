@@ -171,6 +171,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
     user_id                         VARCHAR(128) NOT NULL PRIMARY KEY,
     locale                          VARCHAR(32) NOT NULL DEFAULT 'zh-CN',
     timezone                        VARCHAR(64) NOT NULL DEFAULT 'Asia/Shanghai',
+    model_profile                   VARCHAR(64) NOT NULL DEFAULT '',
     max_plan_iterations             INT NULL,
     max_step_num                    INT NULL,
     daily_token_budget              INT NULL,

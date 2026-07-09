@@ -1,0 +1,10 @@
+- [x] 配置层支持 `model.profiles`。
+- [x] 启动时初始化默认模型和命名 profile 模型。
+- [x] 用户设置和请求体支持 `model_profile`。
+- [x] ChatService 将选定 profile 写入 run context。
+- [x] Agent 节点通过 context-aware getter 获取 Chat/Plan/Vision 模型。
+- [x] 未知 profile 在执行模型前失败并持久化 run error。
+- [x] 补充配置、用户设置和 ChatService 测试。
+- [ ] 后续：A/B eval 分流和效果统计。
+- [ ] 后续：管理后台动态配置模型 profile。
+- [ ] 后续：按任务类型自动选择模型。

@@ -30,6 +30,7 @@ func TestUserSettingsLifecycleWithMySQL(t *testing.T) {
 		UserID:                        userID,
 		Locale:                        "en-US",
 		Timezone:                      "America/Los_Angeles",
+		ModelProfile:                  "FAST",
 		MaxPlanIterations:             sql.NullInt64{Int64: 99, Valid: true},
 		MaxStepNum:                    sql.NullInt64{Int64: 0, Valid: true},
 		DailyTokenBudget:              sql.NullInt64{Int64: 500000, Valid: true},
@@ -45,6 +46,9 @@ func TestUserSettingsLifecycleWithMySQL(t *testing.T) {
 	}
 	if got.Locale != "en-US" || got.Timezone != "America/Los_Angeles" {
 		t.Fatalf("unexpected locale/timezone: %+v", got)
+	}
+	if got.ModelProfile != "fast" {
+		t.Fatalf("model_profile not normalized/persisted: %+v", got)
 	}
 	if got.MaxPlanIterations.Int64 != 10 || got.MaxStepNum.Int64 != 1 {
 		t.Fatalf("settings should be clamped: %+v", got)
