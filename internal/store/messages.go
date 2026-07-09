@@ -144,6 +144,10 @@ func ListThreadsForUser(ctx context.Context, db *sql.DB, userID string, limit in
 }
 
 func SearchThreadsForUser(ctx context.Context, db *sql.DB, userID, query string, limit int) ([]ThreadInfo, error) {
+	return SearchThreadsForUserInScope(ctx, db, userID, query, nil, limit)
+}
+
+func SearchThreadsForUserInScope(ctx context.Context, db *sql.DB, userID, query string, teamID *string, limit int) ([]ThreadInfo, error) {
 	userID = NormalizeUserID(userID)
 	query = strings.TrimSpace(query)
 	if limit <= 0 {
@@ -156,6 +160,11 @@ func SearchThreadsForUser(ctx context.Context, db *sql.DB, userID, query string,
 		SELECT 1 FROM team_members tm WHERE tm.team_id=t.team_id AND tm.user_id=?
 	)))`
 	args := []any{userID, userID}
+	if teamID != nil {
+		scopeTeamID := strings.TrimSpace(*teamID)
+		where += ` AND t.team_id=?`
+		args = append(args, scopeTeamID)
+	}
 	if query != "" {
 		like := "%" + strings.ReplaceAll(query, "%", `\%`) + "%"
 		where += ` AND (t.id LIKE ? OR t.title LIKE ? OR EXISTS (

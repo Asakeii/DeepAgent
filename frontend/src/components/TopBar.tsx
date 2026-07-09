@@ -1,5 +1,6 @@
 import { Bell, HeartPulse, History, MessageSquare, MessageSquarePlus, PanelLeft, Search, ShieldCheck } from "lucide-react";
-import type { AgentName } from "../types";
+import type { AgentName, TeamInfo, TeamSettingsInfo } from "../types";
+import { TeamSwitcher } from "./TeamSwitcher";
 
 const agentLabels: Record<string, string> = {
   coordinator: "理解需求",
@@ -19,10 +20,19 @@ interface TopBarProps {
   planReviewEnabled: boolean;
   busy: boolean;
   view: "workspace" | "reminders" | "admin";
+  teams: TeamInfo[];
+  activeTeamId: string;
+  teamSettings?: TeamSettingsInfo;
+  teamsLoading: boolean;
+  teamSaving: boolean;
+  teamError?: string;
   onToggleSidebar: () => void;
   onNew: () => void;
   onTogglePlanReview: (value: boolean) => void;
   onSwitchView: (view: "workspace" | "reminders" | "admin") => void;
+  onTeamScopeChange: (teamId: string) => void;
+  onCreateTeam: (name: string) => Promise<void>;
+  onSaveTeamBudget: (teamId: string, budgetMicros: number) => Promise<void>;
 }
 
 export function TopBar({
@@ -31,10 +41,19 @@ export function TopBar({
   planReviewEnabled,
   busy,
   view,
+  teams,
+  activeTeamId,
+  teamSettings,
+  teamsLoading,
+  teamSaving,
+  teamError,
   onToggleSidebar,
   onNew,
   onTogglePlanReview,
   onSwitchView,
+  onTeamScopeChange,
+  onCreateTeam,
+  onSaveTeamBudget,
 }: TopBarProps) {
   const isResearch = activeAgent && ["planner", "researcher", "coder", "reporter", "research_team", "human_feedback"].includes(activeAgent);
   const label = activeAgent ? (agentLabels[activeAgent] ?? activeAgent) : "随时为你效劳";
@@ -61,6 +80,18 @@ export function TopBar({
       </div>
 
       <div className="topbar-actions">
+        <TeamSwitcher
+          teams={teams}
+          activeTeamId={activeTeamId}
+          settings={teamSettings}
+          loading={teamsLoading}
+          saving={teamSaving}
+          error={teamError}
+          onScopeChange={onTeamScopeChange}
+          onCreateTeam={onCreateTeam}
+          onSaveBudget={onSaveTeamBudget}
+        />
+
         <div className="view-tabs" role="tablist" aria-label="页面切换">
           <button
             className={`view-tab ${view === "workspace" ? "active" : ""}`}

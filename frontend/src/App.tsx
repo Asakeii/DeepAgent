@@ -8,12 +8,37 @@ import { SessionSidebar } from "./components/SessionSidebar";
 import { TopBar } from "./components/TopBar";
 import { AdminOverview } from "./components/AdminOverview";
 import { extractUrls } from "./lib/format";
-import { listReminders, listSessions, loadAdminOverview, loadMessages, newThreadId, streamChat, toggleReminder, type StreamEvent } from "./lib/api";
-import type { AdminOverviewInfo, AgentName, ChatMessage, Plan, ReminderInfo, SessionInfo, ToolActivity, TranscriptItem } from "./types";
+import {
+  createTeam,
+  listReminders,
+  listSessions,
+  listTeams,
+  loadAdminOverview,
+  loadMessages,
+  loadTeamSettings,
+  newThreadId,
+  streamChat,
+  toggleReminder,
+  updateTeamSettings,
+  type StreamEvent,
+} from "./lib/api";
+import type {
+  AdminOverviewInfo,
+  AgentName,
+  ChatMessage,
+  Plan,
+  ReminderInfo,
+  SessionInfo,
+  TeamInfo,
+  TeamSettingsInfo,
+  ToolActivity,
+  TranscriptItem,
+} from "./types";
 
 const ASSISTANT_PLACEHOLDER = "";
 const HIDDEN_ASSISTANT_CONTENT = new Set(["end", "processed"]);
 const ADMIN_KEY_STORAGE = "deepagent.admin_api_key";
+const TEAM_SCOPE_STORAGE = "deepagent.team_scope";
 
 function isAssistantSentinel(content?: string) {
   const normalized = (content ?? "").trim().toLowerCase();
@@ -29,6 +54,13 @@ export function App() {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sessionQuery, setSessionQuery] = useState("");
+  const [teams, setTeams] = useState<TeamInfo[]>([]);
+  const [teamsLoading, setTeamsLoading] = useState(false);
+  const [teamsLoaded, setTeamsLoaded] = useState(false);
+  const [activeTeamId, setActiveTeamId] = useState(() => localStorage.getItem(TEAM_SCOPE_STORAGE) ?? "");
+  const [teamSettings, setTeamSettings] = useState<TeamSettingsInfo | undefined>();
+  const [teamSaving, setTeamSaving] = useState(false);
+  const [teamError, setTeamError] = useState<string | undefined>();
   const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia("(min-width: 900px)").matches);
   const [view, setView] = useState<"workspace" | "reminders" | "admin">("workspace");
   const [items, setItems] = useState<TranscriptItem[]>([]);
@@ -54,17 +86,67 @@ export function App() {
   const refreshSessions = useCallback(async () => {
     setSessionsLoading(true);
     try {
-      setSessions(await listSessions(sessionQuery));
+      setSessions(await listSessions(sessionQuery, activeTeamId));
     } catch {
       setSessions([]);
     } finally {
       setSessionsLoading(false);
     }
-  }, [sessionQuery]);
+  }, [activeTeamId, sessionQuery]);
 
   useEffect(() => {
     void refreshSessions();
   }, [refreshSessions]);
+
+  const refreshTeams = useCallback(async () => {
+    setTeamsLoading(true);
+    setTeamError(undefined);
+    try {
+      setTeams(await listTeams());
+    } catch (error) {
+      setTeams([]);
+      setTeamError(error instanceof Error ? error.message : "团队加载失败");
+    } finally {
+      setTeamsLoaded(true);
+      setTeamsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshTeams();
+  }, [refreshTeams]);
+
+  useEffect(() => {
+    if (!activeTeamId) {
+      setTeamSettings(undefined);
+      setTeamError(undefined);
+      return;
+    }
+    if (teamsLoaded && !teams.some((team) => team.id === activeTeamId)) {
+      setActiveTeamId("");
+      localStorage.removeItem(TEAM_SCOPE_STORAGE);
+      return;
+    }
+    let ignore = false;
+    setTeamsLoading(true);
+    setTeamError(undefined);
+    loadTeamSettings(activeTeamId)
+      .then((settings) => {
+        if (!ignore) setTeamSettings(settings);
+      })
+      .catch((error) => {
+        if (!ignore) {
+          setTeamSettings(undefined);
+          setTeamError(error instanceof Error ? error.message : "团队设置加载失败");
+        }
+      })
+      .finally(() => {
+        if (!ignore) setTeamsLoading(false);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [activeTeamId, teams, teamsLoaded]);
 
   const refreshReminders = useCallback(async () => {
     setRemindersLoading(true);
@@ -197,6 +279,51 @@ export function App() {
       void refreshAdminOverview();
     }
   }, [adminKey, refreshAdminOverview, view]);
+
+  const changeTeamScope = useCallback((nextTeamId: string) => {
+    abortRef.current?.abort();
+    setActiveTeamId(nextTeamId);
+    if (nextTeamId) {
+      localStorage.setItem(TEAM_SCOPE_STORAGE, nextTeamId);
+    } else {
+      localStorage.removeItem(TEAM_SCOPE_STORAGE);
+    }
+    setThreadId(newThreadId());
+    setItems([]);
+    setInput("");
+    setImage(undefined);
+    resetConversationState();
+    setReminders([]);
+  }, [resetConversationState]);
+
+  const handleCreateTeam = useCallback(async (name: string) => {
+    setTeamSaving(true);
+    setTeamError(undefined);
+    try {
+      const team = await createTeam(name);
+      setTeams((current) => (current.some((item) => item.id === team.id) ? current : [team, ...current]));
+      changeTeamScope(team.id);
+      void refreshTeams();
+    } catch (error) {
+      setTeamError(error instanceof Error ? error.message : "创建团队失败");
+      throw error;
+    } finally {
+      setTeamSaving(false);
+    }
+  }, [changeTeamScope, refreshTeams]);
+
+  const handleSaveTeamBudget = useCallback(async (teamId: string, budgetMicros: number) => {
+    setTeamSaving(true);
+    setTeamError(undefined);
+    try {
+      setTeamSettings(await updateTeamSettings(teamId, budgetMicros));
+    } catch (error) {
+      setTeamError(error instanceof Error ? error.message : "团队预算保存失败");
+      throw error;
+    } finally {
+      setTeamSaving(false);
+    }
+  }, []);
 
   const handleStreamEvent = useCallback(
     (event: StreamEvent) => {
@@ -390,6 +517,7 @@ export function App() {
         {
           messages: request.messages,
           thread_id: threadId,
+          team_id: activeTeamId || undefined,
           auto_accepted_plan: !planReviewEnabled,
           interrupt_feedback: request.interrupt_feedback,
           image_base64: request.image_base64,
@@ -439,7 +567,7 @@ export function App() {
         image_base64: image,
       });
     },
-    [appendItem, busy, image, input, planReviewEnabled, threadId],
+    [appendItem, activeTeamId, busy, image, input, planReviewEnabled, threadId],
   );
 
   const acceptPlan = useCallback(async () => {
@@ -454,7 +582,7 @@ export function App() {
       agent: "research_team",
     });
     await runStream({ messages: [], interrupt_feedback: "accepted" });
-  }, [appendItem, planReviewEnabled, threadId]);
+  }, [appendItem, activeTeamId, planReviewEnabled, threadId]);
 
   const editPlan = useCallback(
     async (feedback: string) => {
@@ -480,7 +608,7 @@ export function App() {
         interrupt_feedback: "edit_plan",
       });
     },
-    [appendItem, planReviewEnabled, threadId],
+    [appendItem, activeTeamId, planReviewEnabled, threadId],
   );
 
   const newChat = useCallback(() => {
@@ -551,10 +679,19 @@ export function App() {
           planReviewEnabled={planReviewEnabled}
           busy={busy}
           view={view}
+          teams={teams}
+          activeTeamId={activeTeamId}
+          teamSettings={teamSettings}
+          teamsLoading={teamsLoading}
+          teamSaving={teamSaving}
+          teamError={teamError}
           onToggleSidebar={() => setSidebarOpen((value) => !value)}
           onNew={newChat}
           onTogglePlanReview={setPlanReviewEnabled}
           onSwitchView={switchView}
+          onTeamScopeChange={changeTeamScope}
+          onCreateTeam={handleCreateTeam}
+          onSaveTeamBudget={handleSaveTeamBudget}
         />
 
         <div className="workspace-body">

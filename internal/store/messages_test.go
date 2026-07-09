@@ -122,6 +122,59 @@ func TestSearchThreadsForUser(t *testing.T) {
 	}
 }
 
+func TestSearchThreadsForUserInScope(t *testing.T) {
+	db := DBForTest(t)
+	if db == nil {
+		t.Skip("mysql not available")
+	}
+	ctx := context.Background()
+	userID := "session-scope-user-" + randomSuffix()
+	personalThread := "session-scope-personal-" + randomSuffix()
+	teamThread := "session-scope-team-" + randomSuffix()
+	team, err := CreateTeam(ctx, db, userID, "Scope Team "+randomSuffix())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, "DELETE FROM messages WHERE thread_id IN (?, ?)", personalThread, teamThread)
+		_, _ = db.ExecContext(ctx, "DELETE FROM threads WHERE id IN (?, ?)", personalThread, teamThread)
+		_, _ = db.ExecContext(ctx, "DELETE FROM team_members WHERE team_id=?", team.ID)
+		_, _ = db.ExecContext(ctx, "DELETE FROM teams WHERE id=?", team.ID)
+		_, _ = db.ExecContext(ctx, "DELETE FROM users WHERE id=?", userID)
+	})
+
+	if err := EnsureThread(ctx, db, personalThread, userID, "个人会话", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureThreadWithTeam(ctx, db, teamThread, userID, team.ID, "团队会话", "test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := AppendMessage(ctx, db, personalThread, string(schema.User), "个人空间研究"); err != nil {
+		t.Fatal(err)
+	}
+	if err := AppendMessage(ctx, db, teamThread, string(schema.User), "团队空间研究"); err != nil {
+		t.Fatal(err)
+	}
+
+	personalScope := ""
+	personal, err := SearchThreadsForUserInScope(ctx, db, userID, "空间研究", &personalScope, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(personal) != 1 || personal[0].ThreadID != personalThread || personal[0].TeamID != "" {
+		t.Fatalf("unexpected personal scope: %+v", personal)
+	}
+
+	teamScope := team.ID
+	teamThreads, err := SearchThreadsForUserInScope(ctx, db, userID, "空间研究", &teamScope, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(teamThreads) != 1 || teamThreads[0].ThreadID != teamThread || teamThreads[0].TeamID != team.ID {
+		t.Fatalf("unexpected team scope: %+v", teamThreads)
+	}
+}
+
 // randomSuffix 给测试用唯一 thread_id；不在生产路径。
 func randomSuffix() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())

@@ -13,6 +13,21 @@ export interface SessionInfo {
   msgCount: number;
 }
 
+export interface TeamInfo {
+  id: string;
+  name: string;
+  role: "owner" | "admin" | "member" | string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TeamSettingsInfo {
+  teamId: string;
+  dailyCostBudgetMicros?: number;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
 export interface PlanStep {
   need_web_search: boolean;
   title: string;

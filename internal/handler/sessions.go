@@ -19,7 +19,12 @@ func ListSessions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	threads, err := store.SearchThreadsForUser(r.Context(), infra.DB, userID, r.URL.Query().Get("q"), limit)
+	var teamID *string
+	if _, ok := r.URL.Query()["team_id"]; ok {
+		v := r.URL.Query().Get("team_id")
+		teamID = &v
+	}
+	threads, err := store.SearchThreadsForUserInScope(r.Context(), infra.DB, userID, r.URL.Query().Get("q"), teamID, limit)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)

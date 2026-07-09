@@ -1,13 +1,23 @@
-import type { AdminOverviewInfo, ChatEventPayload, ChatMessage, ReminderInfo, SessionInfo, StreamRequest } from "../types";
+import type {
+  AdminOverviewInfo,
+  ChatEventPayload,
+  ChatMessage,
+  ReminderInfo,
+  SessionInfo,
+  StreamRequest,
+  TeamInfo,
+  TeamSettingsInfo,
+} from "../types";
 
 export interface StreamEvent {
   event: string;
   data: ChatEventPayload;
 }
 
-export async function listSessions(query = ""): Promise<SessionInfo[]> {
+export async function listSessions(query = "", teamId?: string): Promise<SessionInfo[]> {
   const params = new URLSearchParams({ limit: "50" });
   if (query.trim()) params.set("q", query.trim());
+  if (teamId !== undefined) params.set("team_id", teamId);
   const response = await fetch(`/api/sessions?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`Failed to load sessions (${response.status})`);
@@ -20,6 +30,74 @@ export async function listSessions(query = ""): Promise<SessionInfo[]> {
     lastAt: String(item.last_at ?? item.LastAt ?? ""),
     msgCount: Number(item.msg_count ?? item.MsgCount ?? 0),
   }));
+}
+
+function mapTeam(item: Record<string, unknown>): TeamInfo {
+  return {
+    id: String(item.id ?? item.ID ?? ""),
+    name: String(item.name ?? item.Name ?? ""),
+    role: String(item.role ?? item.Role ?? "member"),
+    createdAt: String(item.created_at ?? item.CreatedAt ?? "") || undefined,
+    updatedAt: String(item.updated_at ?? item.UpdatedAt ?? "") || undefined,
+  };
+}
+
+export async function listTeams(): Promise<TeamInfo[]> {
+  const response = await fetch("/api/teams");
+  if (!response.ok) {
+    throw new Error(`Failed to load teams (${response.status})`);
+  }
+  const payload = await response.json();
+  return ((payload.teams ?? []) as Array<Record<string, unknown>>).map(mapTeam);
+}
+
+export async function createTeam(name: string): Promise<TeamInfo> {
+  const response = await fetch("/api/teams", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    throw new Error(`Create team failed (${response.status})`);
+  }
+  const payload = await response.json();
+  return mapTeam(payload.team ?? {});
+}
+
+function mapTeamSettings(item: Record<string, unknown>): TeamSettingsInfo {
+  const rawBudget = item.daily_cost_budget_micros ?? item.DailyCostBudgetMicros;
+  return {
+    teamId: String(item.team_id ?? item.TeamID ?? ""),
+    dailyCostBudgetMicros: rawBudget === undefined || rawBudget === null ? undefined : Number(rawBudget),
+    updatedBy: String(item.updated_by ?? item.UpdatedBy ?? "") || undefined,
+    updatedAt: String(item.updated_at ?? item.UpdatedAt ?? "") || undefined,
+  };
+}
+
+export async function loadTeamSettings(teamId: string): Promise<TeamSettingsInfo> {
+  const params = new URLSearchParams({ team_id: teamId });
+  const response = await fetch(`/api/team-settings?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error(`Load team settings failed (${response.status})`);
+  }
+  const payload = await response.json();
+  return mapTeamSettings(payload.settings ?? {});
+}
+
+export async function updateTeamSettings(teamId: string, dailyCostBudgetMicros: number): Promise<TeamSettingsInfo> {
+  const response = await fetch("/api/team-settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      team_id: teamId,
+      daily_cost_budget_micros: dailyCostBudgetMicros,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Update team settings failed (${response.status})`);
+  }
+  const payload = await response.json();
+  return mapTeamSettings(payload.settings ?? {});
 }
 
 export async function loadMessages(threadId: string): Promise<ChatMessage[]> {
