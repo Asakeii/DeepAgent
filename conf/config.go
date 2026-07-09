@@ -58,6 +58,13 @@ type ModelEndpointConfig struct {
 	BaseURL      string `yaml:"base_url"`
 }
 
+type ModelPriceConfig struct {
+	InputPerMillion       float64 `yaml:"input_per_million"`
+	OutputPerMillion      float64 `yaml:"output_per_million"`
+	CachedInputPerMillion float64 `yaml:"cached_input_per_million"`
+	ReasoningPerMillion   float64 `yaml:"reasoning_per_million"`
+}
+
 // ModelConfig 描述 OpenAI-compatible chat completion 服务配置。
 // VisionModel 为识图 agent 专用模型，未配置时回退主 ChatModel。
 // Profiles 用于多模型路由：请求或用户设置可选择一个命名 profile。
@@ -67,6 +74,7 @@ type ModelConfig struct {
 	BaseURL      string                         `yaml:"base_url"`
 	VisionModel  *ModelEndpointConfig           `yaml:"vision_model,omitempty"`
 	Profiles     map[string]ModelEndpointConfig `yaml:"profiles,omitempty"`
+	Prices       map[string]ModelPriceConfig    `yaml:"prices,omitempty"`
 }
 
 // SettingConfig 是 Agent 工作流运行时参数。

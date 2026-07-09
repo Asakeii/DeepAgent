@@ -36,6 +36,7 @@ func DBForTest(t *testing.T) *sql.DB {
 	_ = EnsureArtifactTables(context.Background(), db)
 	_ = EnsureCitationTables(context.Background(), db)
 	_ = EnsureUserSettingsTables(context.Background(), db)
+	_ = EnsureTeamSettingsTables(context.Background(), db)
 	_ = EnsureModelUsageTables(context.Background(), db)
 	_ = EnsurePluginTables(context.Background(), db)
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS runs (

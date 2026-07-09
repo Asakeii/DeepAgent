@@ -21,6 +21,7 @@ type UserSettingsRecord struct {
 	MaxPlanIterations             sql.NullInt64
 	MaxStepNum                    sql.NullInt64
 	DailyTokenBudget              sql.NullInt64
+	DailyCostBudgetMicros         sql.NullInt64
 	EnableBackgroundInvestigation sql.NullBool
 	AutoAcceptPlan                sql.NullBool
 	UpdatedAt                     time.Time
@@ -38,12 +39,16 @@ func EnsureUserSettingsTables(ctx context.Context, db *sql.DB) error {
 		max_plan_iterations             INT NULL,
 		max_step_num                    INT NULL,
 		daily_token_budget              INT NULL,
+		daily_cost_budget_micros        BIGINT NULL,
 		enable_background_investigation TINYINT(1) NULL,
 		auto_accept_plan                TINYINT(1) NULL,
 		updated_at                      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
 	if err != nil {
 		return fmt.Errorf("ensure user settings table: %w", err)
+	}
+	if err := ensureColumn(ctx, db, "user_settings", "daily_cost_budget_micros", "BIGINT NULL AFTER daily_token_budget"); err != nil {
+		return err
 	}
 	return nil
 }
@@ -63,10 +68,10 @@ func GetUserSettings(ctx context.Context, db *sql.DB, userID string) (UserSettin
 	record := DefaultUserSettings(userID)
 	err := db.QueryRowContext(ctx,
 		`SELECT user_id, locale, timezone, model_profile, max_plan_iterations, max_step_num,
-		 daily_token_budget, enable_background_investigation, auto_accept_plan, updated_at
+		 daily_token_budget, daily_cost_budget_micros, enable_background_investigation, auto_accept_plan, updated_at
 		 FROM user_settings WHERE user_id=?`,
 		record.UserID,
-	).Scan(&record.UserID, &record.Locale, &record.Timezone, &record.ModelProfile, &record.MaxPlanIterations, &record.MaxStepNum, &record.DailyTokenBudget, &record.EnableBackgroundInvestigation, &record.AutoAcceptPlan, &record.UpdatedAt)
+	).Scan(&record.UserID, &record.Locale, &record.Timezone, &record.ModelProfile, &record.MaxPlanIterations, &record.MaxStepNum, &record.DailyTokenBudget, &record.DailyCostBudgetMicros, &record.EnableBackgroundInvestigation, &record.AutoAcceptPlan, &record.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return record, nil
 	}
@@ -87,8 +92,8 @@ func UpsertUserSettings(ctx context.Context, db *sql.DB, record UserSettingsReco
 	}
 	_, err := db.ExecContext(ctx,
 		`INSERT INTO user_settings
-		 (user_id, locale, timezone, model_profile, max_plan_iterations, max_step_num, daily_token_budget, enable_background_investigation, auto_accept_plan)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 (user_id, locale, timezone, model_profile, max_plan_iterations, max_step_num, daily_token_budget, daily_cost_budget_micros, enable_background_investigation, auto_accept_plan)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON DUPLICATE KEY UPDATE
 		 locale=VALUES(locale),
 		 timezone=VALUES(timezone),
@@ -96,9 +101,10 @@ func UpsertUserSettings(ctx context.Context, db *sql.DB, record UserSettingsReco
 		 max_plan_iterations=VALUES(max_plan_iterations),
 		 max_step_num=VALUES(max_step_num),
 		 daily_token_budget=VALUES(daily_token_budget),
+		 daily_cost_budget_micros=VALUES(daily_cost_budget_micros),
 		 enable_background_investigation=VALUES(enable_background_investigation),
 		 auto_accept_plan=VALUES(auto_accept_plan)`,
-		record.UserID, record.Locale, record.Timezone, record.ModelProfile, record.MaxPlanIterations, record.MaxStepNum, record.DailyTokenBudget, record.EnableBackgroundInvestigation, record.AutoAcceptPlan,
+		record.UserID, record.Locale, record.Timezone, record.ModelProfile, record.MaxPlanIterations, record.MaxStepNum, record.DailyTokenBudget, record.DailyCostBudgetMicros, record.EnableBackgroundInvestigation, record.AutoAcceptPlan,
 	)
 	if err != nil {
 		return fmt.Errorf("upsert user settings: %w", err)
@@ -129,6 +135,7 @@ func normalizeUserSettings(record *UserSettingsRecord) {
 	record.MaxPlanIterations = normalizeNullableInt(record.MaxPlanIterations, 1, 10)
 	record.MaxStepNum = normalizeNullableInt(record.MaxStepNum, 1, 20)
 	record.DailyTokenBudget = normalizeNullableInt(record.DailyTokenBudget, 1000, 100000000)
+	record.DailyCostBudgetMicros = normalizeNullableInt(record.DailyCostBudgetMicros, 1, 1_000_000_000_000)
 }
 
 func normalizeNullableInt(value sql.NullInt64, min, max int64) sql.NullInt64 {

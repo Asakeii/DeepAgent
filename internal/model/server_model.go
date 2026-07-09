@@ -254,9 +254,26 @@ type UserSettingsResp struct {
 	MaxPlanIterations             *int   `json:"max_plan_iterations,omitempty"`
 	MaxStepNum                    *int   `json:"max_step_num,omitempty"`
 	DailyTokenBudget              *int   `json:"daily_token_budget,omitempty"`
+	DailyCostBudgetMicros         *int64 `json:"daily_cost_budget_micros,omitempty"`
 	EnableBackgroundInvestigation *bool  `json:"enable_background_investigation,omitempty"`
 	AutoAcceptPlan                *bool  `json:"auto_accept_plan,omitempty"`
 	UpdatedAt                     string `json:"updated_at,omitempty"`
+}
+
+type TeamSettingsResp struct {
+	TeamID                string `json:"team_id"`
+	DailyCostBudgetMicros *int64 `json:"daily_cost_budget_micros,omitempty"`
+	UpdatedBy             string `json:"updated_by,omitempty"`
+	UpdatedAt             string `json:"updated_at,omitempty"`
+}
+
+type UpdateTeamSettingsRequest struct {
+	TeamID                string `json:"team_id"`
+	DailyCostBudgetMicros *int64 `json:"daily_cost_budget_micros,omitempty"`
+}
+
+type TeamSettingsResponse struct {
+	Settings *TeamSettingsResp `json:"settings"`
 }
 
 type UpdateUserSettingsRequest struct {
@@ -266,6 +283,7 @@ type UpdateUserSettingsRequest struct {
 	MaxPlanIterations             *int    `json:"max_plan_iterations,omitempty"`
 	MaxStepNum                    *int    `json:"max_step_num,omitempty"`
 	DailyTokenBudget              *int    `json:"daily_token_budget,omitempty"`
+	DailyCostBudgetMicros         *int64  `json:"daily_cost_budget_micros,omitempty"`
 	EnableBackgroundInvestigation *bool   `json:"enable_background_investigation,omitempty"`
 	AutoAcceptPlan                *bool   `json:"auto_accept_plan,omitempty"`
 }

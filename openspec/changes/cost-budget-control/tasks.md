@@ -1,0 +1,8 @@
+- [x] 为 `model.prices` 增加模型价格表配置。
+- [x] 为 `user_settings` 增加 `daily_cost_budget_micros` schema 和 migration。
+- [x] 新增 `team_settings` 表、Store 方法和团队预算 API。
+- [x] 基于 `model_usage_logs` 聚合用户/团队每日金额成本。
+- [x] ChatService 在模型执行前拦截用户或团队金额预算耗尽的 run。
+- [x] 补充配置、Store 和 ChatService 测试。
+- [ ] 后续：运行中基于 streaming usage 做更细粒度熔断。
+- [ ] 后续：前端团队预算配置入口和团队用量趋势。

@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -19,6 +22,18 @@ type ModelUsageRecord struct {
 	TotalTokens      int
 	CachedTokens     int
 	ReasoningTokens  int
+}
+
+type ModelPrice struct {
+	InputPerMillion       float64
+	OutputPerMillion      float64
+	CachedInputPerMillion float64
+	ReasoningPerMillion   float64
+}
+
+type ModelCostSummary struct {
+	CostMicros    int64
+	UnknownModels []string
 }
 
 func EnsureModelUsageTables(ctx context.Context, db *sql.DB) error {
@@ -95,4 +110,105 @@ func SumUserModelTokensSince(ctx context.Context, db *sql.DB, userID string, sin
 		return 0, fmt.Errorf("sum user model tokens: %w", err)
 	}
 	return total, nil
+}
+
+func SumUserModelCostSince(ctx context.Context, db *sql.DB, userID string, since time.Time, prices map[string]ModelPrice) (ModelCostSummary, error) {
+	if db == nil {
+		return ModelCostSummary{}, fmt.Errorf("db is nil")
+	}
+	userID = NormalizeUserID(userID)
+	rows, err := db.QueryContext(ctx,
+		`SELECT model,
+		 COALESCE(SUM(prompt_tokens), 0),
+		 COALESCE(SUM(completion_tokens), 0),
+		 COALESCE(SUM(cached_tokens), 0),
+		 COALESCE(SUM(reasoning_tokens), 0)
+		 FROM model_usage_logs
+		 WHERE user_id=? AND created_at>=?
+		 GROUP BY model`,
+		userID, since,
+	)
+	if err != nil {
+		return ModelCostSummary{}, fmt.Errorf("sum user model cost: %w", err)
+	}
+	defer rows.Close()
+	return scanModelCostRows(rows, prices)
+}
+
+func SumTeamModelCostSince(ctx context.Context, db *sql.DB, teamID string, since time.Time, prices map[string]ModelPrice) (ModelCostSummary, error) {
+	if db == nil {
+		return ModelCostSummary{}, fmt.Errorf("db is nil")
+	}
+	teamID = strings.TrimSpace(teamID)
+	if teamID == "" {
+		return ModelCostSummary{}, fmt.Errorf("%w: team id is required", ErrValidation)
+	}
+	rows, err := db.QueryContext(ctx,
+		`SELECT m.model,
+		 COALESCE(SUM(m.prompt_tokens), 0),
+		 COALESCE(SUM(m.completion_tokens), 0),
+		 COALESCE(SUM(m.cached_tokens), 0),
+		 COALESCE(SUM(m.reasoning_tokens), 0)
+		 FROM model_usage_logs m
+		 JOIN threads t ON t.id=m.thread_id
+		 WHERE t.team_id=? AND m.created_at>=?
+		 GROUP BY m.model`,
+		teamID, since,
+	)
+	if err != nil {
+		return ModelCostSummary{}, fmt.Errorf("sum team model cost: %w", err)
+	}
+	defer rows.Close()
+	return scanModelCostRows(rows, prices)
+}
+
+func scanModelCostRows(rows *sql.Rows, prices map[string]ModelPrice) (ModelCostSummary, error) {
+	out := ModelCostSummary{}
+	unknown := map[string]bool{}
+	for rows.Next() {
+		var model string
+		var promptTokens, completionTokens, cachedTokens, reasoningTokens int64
+		if err := rows.Scan(&model, &promptTokens, &completionTokens, &cachedTokens, &reasoningTokens); err != nil {
+			return out, err
+		}
+		price, ok := prices[model]
+		if !ok {
+			unknown[model] = true
+			continue
+		}
+		out.CostMicros += ModelUsageCostMicros(promptTokens, completionTokens, cachedTokens, reasoningTokens, price)
+	}
+	if err := rows.Err(); err != nil {
+		return out, err
+	}
+	for model := range unknown {
+		out.UnknownModels = append(out.UnknownModels, model)
+	}
+	sort.Strings(out.UnknownModels)
+	return out, nil
+}
+
+func ModelUsageCostMicros(promptTokens, completionTokens, cachedTokens, reasoningTokens int64, price ModelPrice) int64 {
+	if cachedTokens < 0 {
+		cachedTokens = 0
+	}
+	if promptTokens < 0 {
+		promptTokens = 0
+	}
+	if cachedTokens > promptTokens {
+		cachedTokens = promptTokens
+	}
+	uncachedPrompt := promptTokens - cachedTokens
+	cachedPrice := price.CachedInputPerMillion
+	if cachedPrice <= 0 {
+		cachedPrice = price.InputPerMillion
+	}
+	total := float64(uncachedPrompt)*price.InputPerMillion +
+		float64(cachedTokens)*cachedPrice +
+		float64(completionTokens)*price.OutputPerMillion +
+		float64(reasoningTokens)*price.ReasoningPerMillion
+	if total <= 0 {
+		return 0
+	}
+	return int64(math.Round(total))
 }

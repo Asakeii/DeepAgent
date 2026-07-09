@@ -34,6 +34,7 @@ func TestUserSettingsLifecycleWithMySQL(t *testing.T) {
 		MaxPlanIterations:             sql.NullInt64{Int64: 99, Valid: true},
 		MaxStepNum:                    sql.NullInt64{Int64: 0, Valid: true},
 		DailyTokenBudget:              sql.NullInt64{Int64: 500000, Valid: true},
+		DailyCostBudgetMicros:         sql.NullInt64{Int64: 2500000, Valid: true},
 		EnableBackgroundInvestigation: sql.NullBool{Bool: true, Valid: true},
 		AutoAcceptPlan:                sql.NullBool{Bool: false, Valid: true},
 	}); err != nil {
@@ -55,6 +56,9 @@ func TestUserSettingsLifecycleWithMySQL(t *testing.T) {
 	}
 	if !got.DailyTokenBudget.Valid || got.DailyTokenBudget.Int64 != 500000 {
 		t.Fatalf("daily_token_budget not persisted: %+v", got)
+	}
+	if !got.DailyCostBudgetMicros.Valid || got.DailyCostBudgetMicros.Int64 != 2500000 {
+		t.Fatalf("daily_cost_budget_micros not persisted: %+v", got)
 	}
 	if !got.EnableBackgroundInvestigation.Valid || !got.EnableBackgroundInvestigation.Bool {
 		t.Fatalf("enable_background_investigation not persisted: %+v", got)

@@ -41,6 +41,15 @@ model:
       default_model: "<your stronger model>"
       api_key: "ark-xxxxx"
       base_url: "https://ark.cn-beijing.volces.com/api/v3"
+  # Optional model price table for cost budgets. Values are USD per 1M tokens.
+  # Keep this table in sync with your provider contract; the service does not
+  # hardcode vendor prices.
+  prices:
+    doubao-seed-2-0-mini-260428:
+      input_per_million: 0.0
+      output_per_million: 0.0
+      cached_input_per_million: 0.0
+      reasoning_per_million: 0.0
 
 setting:
   max_plan_iterations: 1

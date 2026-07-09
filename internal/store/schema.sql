@@ -207,9 +207,17 @@ CREATE TABLE IF NOT EXISTS user_settings (
     max_plan_iterations             INT NULL,
     max_step_num                    INT NULL,
     daily_token_budget              INT NULL,
+    daily_cost_budget_micros        BIGINT NULL,
     enable_background_investigation TINYINT(1) NULL,
     auto_accept_plan                TINYINT(1) NULL,
     updated_at                      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS team_settings (
+    team_id                    VARCHAR(128) NOT NULL PRIMARY KEY,
+    daily_cost_budget_micros   BIGINT NULL,
+    updated_by                 VARCHAR(128) NOT NULL DEFAULT '',
+    updated_at                 TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS model_usage_logs (

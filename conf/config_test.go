@@ -26,6 +26,12 @@ model:
       default_model: "deep-model"
       api_key: "dk"
       base_url: "du"
+  prices:
+    m:
+      input_per_million: 1.25
+      output_per_million: 5
+      cached_input_per_million: 0.25
+      reasoning_per_million: 2
 setting:
   max_step_num: 3
   run_timeout_seconds: 120
@@ -67,6 +73,9 @@ server:
 	}
 	if len(cfg.Model.Profiles) != 2 || cfg.Model.Profiles["FAST"].DefaultModel != "fast-model" || cfg.Model.Profiles["deep"].BaseURL != "du" {
 		t.Fatalf("model profiles not parsed: %+v", cfg.Model.Profiles)
+	}
+	if cfg.Model.Prices["m"].InputPerMillion != 1.25 || cfg.Model.Prices["m"].OutputPerMillion != 5 {
+		t.Fatalf("model prices not parsed: %+v", cfg.Model.Prices)
 	}
 	if cfg.Setting.RunTimeoutSeconds != 120 {
 		t.Fatalf("run timeout not parsed: %+v", cfg.Setting)

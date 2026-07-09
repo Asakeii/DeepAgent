@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/eino/schema"
@@ -148,6 +150,22 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 		})
 		return
 	}
+	if exceeded, used, limit, err := dailyCostBudgetExceeded(ctx, req.UserID, req.TeamID, settings); err != nil {
+		runLog.ErrorContext(ctx, "daily cost budget check failed", slog.Any("error", err))
+		_ = runWriter.WriteEvent("error", &model.ChatResp{
+			Role:         "assistant",
+			Content:      "模型金额预算检查失败，请稍后重试",
+			FinishReason: "cost_budget_check_failed",
+		})
+		return
+	} else if exceeded {
+		_ = runWriter.WriteEvent("error", &model.ChatResp{
+			Role:         "assistant",
+			Content:      costBudgetExceededMessage(used, limit),
+			FinishReason: "cost_budget_exceeded",
+		})
+		return
+	}
 	if req.ImageBase64 != "" {
 		if err := validateImageInput(req.ImageBase64); err != nil {
 			_ = runWriter.WriteEvent("error", &model.ChatResp{
@@ -255,6 +273,63 @@ func dailyTokenBudgetExceeded(ctx context.Context, userID string, settings store
 	return used >= settings.DailyTokenBudget.Int64, used, nil
 }
 
+func dailyCostBudgetExceeded(ctx context.Context, userID, teamID string, settings store.UserSettingsRecord) (bool, int64, int64, error) {
+	prices := configuredModelPrices()
+	if teamID != "" {
+		teamSettings, err := store.GetTeamSettings(ctx, infra.DB, teamID)
+		if err != nil {
+			return false, 0, 0, err
+		}
+		if teamSettings.DailyCostBudgetMicros.Valid {
+			if len(prices) == 0 {
+				return false, 0, teamSettings.DailyCostBudgetMicros.Int64, fmt.Errorf("model price table is required for team cost budget")
+			}
+			summary, err := store.SumTeamModelCostSince(ctx, infra.DB, teamID, userDayStart(time.Now(), settings.Timezone), prices)
+			if err != nil {
+				return false, 0, teamSettings.DailyCostBudgetMicros.Int64, err
+			}
+			if len(summary.UnknownModels) > 0 {
+				return false, summary.CostMicros, teamSettings.DailyCostBudgetMicros.Int64, fmt.Errorf("missing model prices: %s", strings.Join(summary.UnknownModels, ", "))
+			}
+			return summary.CostMicros >= teamSettings.DailyCostBudgetMicros.Int64, summary.CostMicros, teamSettings.DailyCostBudgetMicros.Int64, nil
+		}
+	}
+	if !settings.DailyCostBudgetMicros.Valid {
+		return false, 0, 0, nil
+	}
+	if len(prices) == 0 {
+		return false, 0, settings.DailyCostBudgetMicros.Int64, fmt.Errorf("model price table is required for user cost budget")
+	}
+	summary, err := store.SumUserModelCostSince(ctx, infra.DB, userID, userDayStart(time.Now(), settings.Timezone), prices)
+	if err != nil {
+		return false, 0, settings.DailyCostBudgetMicros.Int64, err
+	}
+	if len(summary.UnknownModels) > 0 {
+		return false, summary.CostMicros, settings.DailyCostBudgetMicros.Int64, fmt.Errorf("missing model prices: %s", strings.Join(summary.UnknownModels, ", "))
+	}
+	return summary.CostMicros >= settings.DailyCostBudgetMicros.Int64, summary.CostMicros, settings.DailyCostBudgetMicros.Int64, nil
+}
+
+func configuredModelPrices() map[string]store.ModelPrice {
+	out := map[string]store.ModelPrice{}
+	if conf.App == nil {
+		return out
+	}
+	for modelName, price := range conf.App.Model.Prices {
+		modelName = strings.TrimSpace(modelName)
+		if modelName == "" {
+			continue
+		}
+		out[modelName] = store.ModelPrice{
+			InputPerMillion:       price.InputPerMillion,
+			OutputPerMillion:      price.OutputPerMillion,
+			CachedInputPerMillion: price.CachedInputPerMillion,
+			ReasoningPerMillion:   price.ReasoningPerMillion,
+		}
+	}
+	return out
+}
+
 func userDayStart(now time.Time, timezone string) time.Time {
 	loc, err := time.LoadLocation(timezone)
 	if err != nil {
@@ -269,6 +344,21 @@ func userDayStart(now time.Time, timezone string) time.Time {
 
 func tokenBudgetExceededMessage(used, limit int64) string {
 	return "今日模型 token 用量已达到预算（已用 " + formatInt64(used) + " / 预算 " + formatInt64(limit) + "），请稍后再试或调整用户设置。"
+}
+
+func costBudgetExceededMessage(usedMicros, limitMicros int64) string {
+	return "今日模型金额用量已达到预算（已用 " + formatMicrosUSD(usedMicros) + " / 预算 " + formatMicrosUSD(limitMicros) + "），请稍后再试或调整预算设置。"
+}
+
+func formatMicrosUSD(value int64) string {
+	sign := ""
+	if value < 0 {
+		sign = "-"
+		value = -value
+	}
+	dollars := value / 1_000_000
+	cents := (value % 1_000_000) / 10_000
+	return sign + "$" + formatInt64(dollars) + "." + fmt.Sprintf("%02d", cents)
 }
 
 func formatInt64(v int64) string {

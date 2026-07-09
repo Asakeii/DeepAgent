@@ -512,8 +512,8 @@ AppendMessage:
 - [x] PDF/HTML 导出（HTML 已支持；PDF 通过可配置 Headless Chrome/Chromium 渲染）。
 - [x] 分享链接。
 - [x] 多模型路由。
-- [x] 成本预算（已支持用户级每日 token 预算；金额预算待补模型价格表）。
-- [x] 团队空间（后端 team/team_members、团队 thread 与共享 artifact 访问已支持；前端切换和团队预算待补）。
+- [x] 成本预算（已支持用户级每日 token/金额预算、团队每日金额预算和配置化模型价格表）。
+- [x] 团队空间（后端 team/team_members、团队 thread、共享 artifact 访问和团队预算已支持；前端切换待补）。
 - [x] 管理后台（后端 overview API 与前端概览页已支持）。
 - [x] A/B eval。
 - [x] 插件市场（后端 MCP 插件目录、用户/团队启用状态和运行时过滤已支持；前端市场页、版本和授权待补）。

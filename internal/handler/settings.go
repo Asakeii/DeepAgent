@@ -84,6 +84,13 @@ func applyUserSettingsUpdate(record *store.UserSettingsRecord, req model.UpdateU
 			record.DailyTokenBudget = sql.NullInt64{Int64: int64(*req.DailyTokenBudget), Valid: true}
 		}
 	}
+	if req.DailyCostBudgetMicros != nil {
+		if *req.DailyCostBudgetMicros <= 0 {
+			record.DailyCostBudgetMicros = sql.NullInt64{}
+		} else {
+			record.DailyCostBudgetMicros = sql.NullInt64{Int64: *req.DailyCostBudgetMicros, Valid: true}
+		}
+	}
 	if req.EnableBackgroundInvestigation != nil {
 		record.EnableBackgroundInvestigation = sql.NullBool{Bool: *req.EnableBackgroundInvestigation, Valid: true}
 	}
@@ -110,6 +117,10 @@ func userSettingsResp(record store.UserSettingsRecord) *model.UserSettingsResp {
 	if record.DailyTokenBudget.Valid {
 		v := int(record.DailyTokenBudget.Int64)
 		resp.DailyTokenBudget = &v
+	}
+	if record.DailyCostBudgetMicros.Valid {
+		v := record.DailyCostBudgetMicros.Int64
+		resp.DailyCostBudgetMicros = &v
 	}
 	if record.EnableBackgroundInvestigation.Valid {
 		v := record.EnableBackgroundInvestigation.Bool
