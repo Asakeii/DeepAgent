@@ -1,0 +1,10 @@
+- [x] 新增 `artifact_shares` schema 和 migration。
+- [x] 分享令牌只存 hash，原始 token 仅创建时返回。
+- [x] 新增 artifact 分享创建接口。
+- [x] 新增 artifact 分享撤销接口。
+- [x] 新增公开只读分享读取接口。
+- [x] 公开响应隐藏内部用户、线程和 run 标识。
+- [x] 补充 store 生命周期测试和 HTTP guard 测试。
+- [ ] 后续：公开分享页 UI。
+- [ ] 后续：分享访问统计和审计。
+- [ ] 后续：分享 citation panel。

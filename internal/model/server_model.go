@@ -178,6 +178,33 @@ type ListArtifactsResponse struct {
 	Artifacts []*ArtifactResp `json:"artifacts"`
 }
 
+type CreateArtifactShareRequest struct {
+	ArtifactID     int64 `json:"artifact_id"`
+	ExpiresInHours int   `json:"expires_in_hours,omitempty"`
+}
+
+type RevokeArtifactShareRequest struct {
+	Token string `json:"token"`
+}
+
+type ArtifactShareResp struct {
+	Token      string `json:"token,omitempty"`
+	ArtifactID int64  `json:"artifact_id"`
+	ShareURL   string `json:"share_url,omitempty"`
+	CreatedAt  string `json:"created_at,omitempty"`
+	ExpiresAt  string `json:"expires_at,omitempty"`
+	RevokedAt  string `json:"revoked_at,omitempty"`
+}
+
+type ArtifactShareResponse struct {
+	Share *ArtifactShareResp `json:"share"`
+}
+
+type SharedArtifactResponse struct {
+	Artifact *ArtifactResp      `json:"artifact"`
+	Share    *ArtifactShareResp `json:"share,omitempty"`
+}
+
 type CitationResp struct {
 	ID         int64  `json:"id"`
 	ArtifactID int64  `json:"artifact_id"`

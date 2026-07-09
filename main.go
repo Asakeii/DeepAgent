@@ -188,6 +188,7 @@ func runServer() {
 	mux.HandleFunc("/v1/chat/completions", handler.OpenAICompatible)
 	mux.HandleFunc("/healthz", handler.Healthz)
 	mux.HandleFunc("/readyz", handler.Readyz)
+	mux.HandleFunc("/share/artifacts", handler.SharedArtifact)
 	// 前端静态文件
 	mux.HandleFunc("/api/sessions", handler.ListSessions)
 	mux.HandleFunc("/api/messages", handler.LoadMessages)
@@ -197,6 +198,7 @@ func runServer() {
 	mux.HandleFunc("/api/metrics/runs", handler.RunMetrics)
 	mux.HandleFunc("/api/memories", handler.Memories)
 	mux.HandleFunc("/api/artifacts", handler.ListArtifacts)
+	mux.HandleFunc("/api/artifact-shares", handler.ArtifactShares)
 	mux.HandleFunc("/api/artifact-citations", handler.ListArtifactCitations)
 	mux.HandleFunc("/api/settings", handler.UserSettings)
 	mux.HandleFunc("/api/reminders", handler.ListReminders)

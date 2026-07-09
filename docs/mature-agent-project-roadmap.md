@@ -480,16 +480,16 @@ AppendMessage:
 
 优先做这些：
 
-- [ ] 用户身份与 thread ownership。
-- [ ] `runs` / `run_events`。
-- [ ] Agent eval dataset。
-- [ ] Tool timeout/retry/audit wrapper。
-- [ ] `ResearchRunner` / `CheckinRunner` 接口化。
-- [ ] WeChat POST 签名校验。
-- [ ] API request body limit。
-- [ ] SSE heartbeat。
-- [ ] 消息写入并发修复。
-- [ ] 结构化日志和 run_id。
+- [x] 用户身份与 thread ownership。
+- [x] `runs` / `run_events`。
+- [x] Agent eval dataset。
+- [x] Tool timeout/retry/audit wrapper。
+- [x] `ResearchRunner` / `CheckinRunner` 接口化。
+- [x] WeChat POST 签名校验。
+- [x] API request body limit。
+- [x] SSE heartbeat。
+- [x] 消息写入并发修复。
+- [x] 结构化日志和 run_id。
 
 ## 6. P1 任务清单
 
@@ -498,9 +498,9 @@ AppendMessage:
 - [x] memory 分层。
 - [x] report artifact。
 - [x] citation 存储。
-- [ ] reminder multi-connection。
-- [ ] run cancellation。
-- [ ] tool risk policy。
+- [x] reminder multi-connection。
+- [x] run cancellation。
+- [x] tool risk policy。
 - [x] prompt injection 防护。
 - [x] 用户设置。
 - [x] 前端 session search。
@@ -510,7 +510,7 @@ AppendMessage:
 最后增强：
 
 - [ ] PDF/HTML 导出。
-- [ ] 分享链接。
+- [x] 分享链接。
 - [ ] 多模型路由。
 - [x] 成本预算（已支持用户级每日 token 预算；金额预算待补模型价格表）。
 - [ ] 团队空间。

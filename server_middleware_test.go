@@ -126,6 +126,24 @@ func TestHTTPGuardsDoNotProtectStaticRoutes(t *testing.T) {
 	}
 }
 
+func TestHTTPGuardsDoNotProtectPublicShareRoutes(t *testing.T) {
+	withTestServerConfig(t, conf.ServerConfig{
+		AllowedOrigins: []string{"https://app.example.com"},
+		MaxBodyBytes:   1024,
+		APIKeys:        []string{"secret"},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/share/artifacts?token=as_test", nil)
+	rec := httptest.NewRecorder()
+
+	withHTTPGuards(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
 func TestHTTPGuardsAllowWhenRateLimitConfiguredWithoutRedis(t *testing.T) {
 	prevRDB := infra.RDB
 	infra.RDB = nil
