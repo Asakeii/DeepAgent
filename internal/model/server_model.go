@@ -8,6 +8,7 @@ type ChatRequest struct {
 	Messages                      []*schema.Message `json:"messages,omitempty"`
 	Debug                         bool              `json:"debug,omitempty"`
 	UserID                        string            `json:"user_id,omitempty"`
+	TeamID                        string            `json:"team_id,omitempty"`
 	RunID                         string            `json:"run_id,omitempty"`
 	ThreadID                      string            `json:"thread_id,omitempty"`
 	Locale                        string            `json:"locale,omitempty"`
@@ -271,6 +272,47 @@ type UpdateUserSettingsRequest struct {
 
 type UserSettingsResponse struct {
 	Settings *UserSettingsResp `json:"settings"`
+}
+
+type TeamResp struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Role      string `json:"role,omitempty"`
+	CreatedAt string `json:"created_at,omitempty"`
+	UpdatedAt string `json:"updated_at,omitempty"`
+}
+
+type CreateTeamRequest struct {
+	Name string `json:"name"`
+}
+
+type CreateTeamResponse struct {
+	Team *TeamResp `json:"team"`
+}
+
+type ListTeamsResponse struct {
+	Teams []*TeamResp `json:"teams"`
+}
+
+type TeamMemberResp struct {
+	TeamID    string `json:"team_id"`
+	UserID    string `json:"user_id"`
+	Role      string `json:"role"`
+	CreatedAt string `json:"created_at,omitempty"`
+}
+
+type AddTeamMemberRequest struct {
+	TeamID string `json:"team_id"`
+	UserID string `json:"user_id"`
+	Role   string `json:"role,omitempty"`
+}
+
+type AddTeamMemberResponse struct {
+	Member *TeamMemberResp `json:"member"`
+}
+
+type ListTeamMembersResponse struct {
+	Members []*TeamMemberResp `json:"members"`
 }
 
 // ChatResp 是 SSE 事件里返回给前端的统一消息结构。

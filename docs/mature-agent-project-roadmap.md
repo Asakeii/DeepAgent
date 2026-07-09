@@ -513,7 +513,7 @@ AppendMessage:
 - [x] 分享链接。
 - [x] 多模型路由。
 - [x] 成本预算（已支持用户级每日 token 预算；金额预算待补模型价格表）。
-- [ ] 团队空间。
+- [x] 团队空间（后端 team/team_members、团队 thread 与共享 artifact 访问已支持；前端切换和团队预算待补）。
 - [x] 管理后台（后端 overview API 与前端概览页已支持）。
 - [x] A/B eval。
 - [ ] 插件市场。

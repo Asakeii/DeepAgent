@@ -36,6 +36,7 @@ func EnsureIdentityTables(ctx context.Context, db *sql.DB) error {
 		`CREATE TABLE IF NOT EXISTS threads (
 			id          VARCHAR(128) NOT NULL PRIMARY KEY,
 			user_id     VARCHAR(128) NOT NULL,
+			team_id     VARCHAR(128) NOT NULL DEFAULT '',
 			title       VARCHAR(255) NOT NULL DEFAULT '',
 			source      VARCHAR(32) NOT NULL DEFAULT 'web',
 			created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -47,6 +48,9 @@ func EnsureIdentityTables(ctx context.Context, db *sql.DB) error {
 		if _, err := db.ExecContext(ctx, stmt); err != nil {
 			return fmt.Errorf("ensure identity tables: %w", err)
 		}
+	}
+	if err := EnsureTeamTables(ctx, db); err != nil {
+		return err
 	}
 	return nil
 }
@@ -75,6 +79,10 @@ func EnsureUser(ctx context.Context, db *sql.DB, userID, provider, providerID st
 }
 
 func EnsureThread(ctx context.Context, db *sql.DB, threadID, userID, title, source string) error {
+	return EnsureThreadWithTeam(ctx, db, threadID, userID, "", title, source)
+}
+
+func EnsureThreadWithTeam(ctx context.Context, db *sql.DB, threadID, userID, teamID, title, source string) error {
 	if db == nil {
 		return fmt.Errorf("db is nil")
 	}
@@ -83,6 +91,7 @@ func EnsureThread(ctx context.Context, db *sql.DB, threadID, userID, title, sour
 		return fmt.Errorf("thread id is required")
 	}
 	userID = NormalizeUserID(userID)
+	teamID = strings.TrimSpace(teamID)
 	if source == "" {
 		source = "web"
 	}
@@ -92,11 +101,18 @@ func EnsureThread(ctx context.Context, db *sql.DB, threadID, userID, title, sour
 	if err := EnsureUser(ctx, db, userID, source, userID); err != nil {
 		return err
 	}
+	if teamID != "" {
+		if ok, err := UserIsTeamMember(ctx, db, teamID, userID); err != nil {
+			return err
+		} else if !ok {
+			return ErrTeamForbidden
+		}
+	}
 	_, err := db.ExecContext(ctx,
-		`INSERT INTO threads (id, user_id, title, source)
-		 VALUES (?, ?, ?, ?)
+		`INSERT INTO threads (id, user_id, team_id, title, source)
+		 VALUES (?, ?, ?, ?, ?)
 		 ON DUPLICATE KEY UPDATE updated_at=CURRENT_TIMESTAMP`,
-		threadID, userID, title, source,
+		threadID, userID, teamID, title, source,
 	)
 	if err != nil {
 		return fmt.Errorf("ensure thread: %w", err)
@@ -109,15 +125,21 @@ func ThreadBelongsToUser(ctx context.Context, db *sql.DB, threadID, userID strin
 		return false, fmt.Errorf("db is nil")
 	}
 	userID = NormalizeUserID(userID)
-	var got string
-	err := db.QueryRowContext(ctx, `SELECT user_id FROM threads WHERE id=?`, threadID).Scan(&got)
+	var ownerID, teamID string
+	err := db.QueryRowContext(ctx, `SELECT user_id, COALESCE(team_id, '') FROM threads WHERE id=?`, threadID).Scan(&ownerID, &teamID)
 	if err == sql.ErrNoRows {
 		return false, nil
 	}
 	if err != nil {
 		return false, fmt.Errorf("query thread owner: %w", err)
 	}
-	return got == userID, nil
+	if ownerID == userID {
+		return true, nil
+	}
+	if teamID == "" {
+		return false, nil
+	}
+	return UserIsTeamMember(ctx, db, teamID, userID)
 }
 
 func RunBelongsToUser(ctx context.Context, db *sql.DB, runID, userID string) (bool, error) {
@@ -125,13 +147,25 @@ func RunBelongsToUser(ctx context.Context, db *sql.DB, runID, userID string) (bo
 		return false, fmt.Errorf("db is nil")
 	}
 	userID = NormalizeUserID(userID)
-	var got string
-	err := db.QueryRowContext(ctx, `SELECT user_id FROM runs WHERE id=?`, runID).Scan(&got)
+	var ownerID, teamID string
+	err := db.QueryRowContext(ctx,
+		`SELECT r.user_id, COALESCE(t.team_id, '')
+		 FROM runs r
+		 LEFT JOIN threads t ON t.id=r.thread_id
+		 WHERE r.id=?`,
+		runID,
+	).Scan(&ownerID, &teamID)
 	if err == sql.ErrNoRows {
 		return false, nil
 	}
 	if err != nil {
 		return false, fmt.Errorf("query run owner: %w", err)
 	}
-	return got == userID, nil
+	if ownerID == userID {
+		return true, nil
+	}
+	if teamID == "" {
+		return false, nil
+	}
+	return UserIsTeamMember(ctx, db, teamID, userID)
 }

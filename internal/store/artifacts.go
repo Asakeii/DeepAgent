@@ -119,19 +119,23 @@ func ListArtifacts(ctx context.Context, db *sql.DB, userID, threadID, kind strin
 	} else if limit > 200 {
 		limit = 200
 	}
-	query := `SELECT id, user_id, thread_id, run_id, kind, title, format, content,
-		COALESCE(metadata, JSON_OBJECT()), version, source, created_at, updated_at
-		FROM artifacts WHERE user_id=?`
-	args := []any{userID}
+	query := `SELECT a.id, a.user_id, a.thread_id, a.run_id, a.kind, a.title, a.format, a.content,
+		COALESCE(a.metadata, JSON_OBJECT()), a.version, a.source, a.created_at, a.updated_at
+		FROM artifacts a
+		LEFT JOIN threads t ON t.id=a.thread_id
+		WHERE (a.user_id=? OR (COALESCE(t.team_id, '')<>'' AND EXISTS (
+			SELECT 1 FROM team_members tm WHERE tm.team_id=t.team_id AND tm.user_id=?
+		)))`
+	args := []any{userID, userID}
 	if threadID != "" {
-		query += ` AND thread_id=?`
+		query += ` AND a.thread_id=?`
 		args = append(args, threadID)
 	}
 	if kind != "" {
-		query += ` AND kind=?`
+		query += ` AND a.kind=?`
 		args = append(args, kind)
 	}
-	query += ` ORDER BY created_at DESC, id DESC LIMIT ?`
+	query += ` ORDER BY a.created_at DESC, a.id DESC LIMIT ?`
 	args = append(args, limit)
 
 	rows, err := db.QueryContext(ctx, query, args...)
@@ -161,11 +165,14 @@ func GetArtifact(ctx context.Context, db *sql.DB, artifactID int64, userID strin
 	userID = NormalizeUserID(userID)
 	var record ArtifactRecord
 	err := db.QueryRowContext(ctx,
-		`SELECT id, user_id, thread_id, run_id, kind, title, format, content,
-		 COALESCE(metadata, JSON_OBJECT()), version, source, created_at, updated_at
-		 FROM artifacts
-		 WHERE id=? AND user_id=?`,
-		artifactID, userID,
+		`SELECT a.id, a.user_id, a.thread_id, a.run_id, a.kind, a.title, a.format, a.content,
+		 COALESCE(a.metadata, JSON_OBJECT()), a.version, a.source, a.created_at, a.updated_at
+		 FROM artifacts a
+		 LEFT JOIN threads t ON t.id=a.thread_id
+		 WHERE a.id=? AND (a.user_id=? OR (COALESCE(t.team_id, '')<>'' AND EXISTS (
+			SELECT 1 FROM team_members tm WHERE tm.team_id=t.team_id AND tm.user_id=?
+		 )))`,
+		artifactID, userID, userID,
 	).Scan(&record.ID, &record.UserID, &record.ThreadID, &record.RunID, &record.Kind, &record.Title, &record.Format, &record.Content, &record.Metadata, &record.Version, &record.Source, &record.CreatedAt, &record.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return ArtifactRecord{}, nil

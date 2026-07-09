@@ -59,8 +59,10 @@ func (s *ChatService) RunStream(ctx context.Context, req model.ChatRequest, writ
 	startedAt := time.Now()
 	runLog := observability.RunLogger(req.RunID, req.ThreadID, req.UserID).With(slog.String("mode", mode))
 	runLog.InfoContext(ctx, "chat run accepted")
-	if err := store.EnsureThread(ctx, infra.DB, req.ThreadID, req.UserID, firstUserMessage(req), mode); err != nil {
+	if err := store.EnsureThreadWithTeam(ctx, infra.DB, req.ThreadID, req.UserID, req.TeamID, firstUserMessage(req), mode); err != nil {
 		runLog.ErrorContext(ctx, "ensure thread failed", slog.Any("error", err))
+		_ = writer.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "ensure thread failed: " + err.Error()})
+		return
 	}
 	if ok, err := store.ThreadBelongsToUser(ctx, infra.DB, req.ThreadID, req.UserID); err != nil {
 		runLog.ErrorContext(ctx, "thread ownership check failed", slog.Any("error", err))

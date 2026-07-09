@@ -15,6 +15,7 @@ export async function listSessions(query = ""): Promise<SessionInfo[]> {
   const raw = await response.json();
   return raw.map((item: Record<string, unknown>) => ({
     threadId: String(item.thread_id ?? item.ThreadID ?? ""),
+    teamId: String(item.team_id ?? item.TeamID ?? "") || undefined,
     firstMsg: String(item.first_msg ?? item.FirstMsg ?? ""),
     lastAt: String(item.last_at ?? item.LastAt ?? ""),
     msgCount: Number(item.msg_count ?? item.MsgCount ?? 0),

@@ -108,10 +108,11 @@ func RecentMessages(ctx context.Context, db *sql.DB, threadID string, limit int)
 
 // ThreadInfo 会话摘要信息。
 type ThreadInfo struct {
-	ThreadID string
-	FirstMsg string // 第一条用户消息作为标题
-	LastAt   string // 最后消息时间
-	MsgCount int
+	ThreadID string `json:"thread_id"`
+	TeamID   string `json:"team_id,omitempty"`
+	FirstMsg string `json:"first_msg"` // 第一条用户消息作为标题
+	LastAt   string `json:"last_at"`   // 最后消息时间
+	MsgCount int    `json:"msg_count"`
 }
 
 // ListThreads 返回所有 thread 的基本信息，按最近活动排序。
@@ -151,8 +152,10 @@ func SearchThreadsForUser(ctx context.Context, db *sql.DB, userID, query string,
 	if limit > 200 {
 		limit = 200
 	}
-	where := `WHERE t.user_id=?`
-	args := []any{userID}
+	where := `WHERE (t.user_id=? OR (t.team_id<>'' AND EXISTS (
+		SELECT 1 FROM team_members tm WHERE tm.team_id=t.team_id AND tm.user_id=?
+	)))`
+	args := []any{userID, userID}
 	if query != "" {
 		like := "%" + strings.ReplaceAll(query, "%", `\%`) + "%"
 		where += ` AND (t.id LIKE ? OR t.title LIKE ? OR EXISTS (
@@ -162,14 +165,14 @@ func SearchThreadsForUser(ctx context.Context, db *sql.DB, userID, query string,
 	}
 	args = append(args, limit)
 	rows, err := db.QueryContext(ctx,
-		`SELECT t.id,
+		`SELECT t.id, COALESCE(t.team_id, ''),
 		 COALESCE(NULLIF(t.title, ''), (SELECT content FROM messages m2 WHERE m2.thread_id=t.id AND role='user' ORDER BY turn_idx ASC LIMIT 1), '') AS first_msg,
 		 COALESCE(MAX(m.created_at), t.updated_at) AS last_at,
 		 COUNT(m.id) AS msg_count
 		 FROM threads t
 		 LEFT JOIN messages m ON m.thread_id=t.id
 		 `+where+`
-		 GROUP BY t.id, t.title, t.updated_at
+		 GROUP BY t.id, t.team_id, t.title, t.updated_at
 		 ORDER BY last_at DESC LIMIT ?`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list user threads: %w", err)
@@ -178,7 +181,7 @@ func SearchThreadsForUser(ctx context.Context, db *sql.DB, userID, query string,
 	var out []ThreadInfo
 	for rows.Next() {
 		var t ThreadInfo
-		if err := rows.Scan(&t.ThreadID, &t.FirstMsg, &t.LastAt, &t.MsgCount); err != nil {
+		if err := rows.Scan(&t.ThreadID, &t.TeamID, &t.FirstMsg, &t.LastAt, &t.MsgCount); err != nil {
 			return nil, err
 		}
 		out = append(out, t)

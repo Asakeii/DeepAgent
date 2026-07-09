@@ -7,6 +7,7 @@ export interface ChatMessage {
 
 export interface SessionInfo {
   threadId: string;
+  teamId?: string;
   firstMsg: string;
   lastAt: string;
   msgCount: number;
@@ -60,6 +61,7 @@ export interface ChatEventPayload {
 export interface StreamRequest {
   messages: ChatMessage[];
   thread_id: string;
+  team_id?: string;
   locale?: string;
   auto_accepted_plan: boolean;
   interrupt_feedback?: "accepted" | "edit_plan";
