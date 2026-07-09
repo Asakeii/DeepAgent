@@ -89,6 +89,9 @@ type ServerConfig struct {
 	AdminAPIKeys            []string `yaml:"admin_api_keys"`
 	RateLimitPerMinute      int      `yaml:"rate_limit_per_minute"`
 	SSEHeartbeatSeconds     int      `yaml:"sse_heartbeat_seconds"`
+	PDFRendererCommand      string   `yaml:"pdf_renderer_command"`
+	PDFRendererArgs         []string `yaml:"pdf_renderer_args"`
+	PDFRendererTimeout      int      `yaml:"pdf_renderer_timeout_seconds"`
 }
 
 var App *Config // 全局配置变量，保存加载后的配置
@@ -139,6 +142,9 @@ func Load(ctx context.Context) (*Config, error) {
 	if cfg.Server.SSEHeartbeatSeconds == 0 {
 		cfg.Server.SSEHeartbeatSeconds = DefaultSSEHeartbeatSeconds
 	}
+	if cfg.Server.PDFRendererTimeout <= 0 {
+		cfg.Server.PDFRendererTimeout = 30
+	}
 
 	App = &cfg // 保存到全局变量
 	return App, nil
@@ -149,6 +155,13 @@ func (c ServerConfig) SSEHeartbeatInterval() time.Duration {
 		return 0
 	}
 	return time.Duration(c.SSEHeartbeatSeconds) * time.Second
+}
+
+func (c ServerConfig) PDFRendererTimeoutDuration() time.Duration {
+	if c.PDFRendererTimeout <= 0 {
+		return 30 * time.Second
+	}
+	return time.Duration(c.PDFRendererTimeout) * time.Second
 }
 
 func (c SettingConfig) RunTimeout() time.Duration {

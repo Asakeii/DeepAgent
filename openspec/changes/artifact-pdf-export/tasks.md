@@ -1,0 +1,7 @@
+- [x] `/api/artifact-exports` 支持 `format=pdf`。
+- [x] PDF 导出复用现有 artifact HTML 模板。
+- [x] 新增可配置 Headless Chrome/Chromium renderer。
+- [x] 支持 renderer 参数占位符和超时控制。
+- [x] 保持 artifact 用户/团队访问边界。
+- [x] 补充 renderer 参数、文件名和 fake renderer 单测。
+- [ ] 后续：异步导出、导出缓存和水印。

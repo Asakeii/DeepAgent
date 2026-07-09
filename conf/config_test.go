@@ -41,6 +41,9 @@ server:
   admin_api_keys: ["admin-key"]
   rate_limit_per_minute: 60
   sse_heartbeat_seconds: 10
+  pdf_renderer_command: "chromium"
+  pdf_renderer_args: ["--headless", "--print-to-pdf={{output}}", "{{input}}"]
+  pdf_renderer_timeout_seconds: 45
 `)
 	if err := os.MkdirAll(filepath.Join(dir, "conf"), 0755); err != nil {
 		t.Fatal(err)
@@ -80,6 +83,9 @@ server:
 	if len(cfg.Server.APIKeys) != 1 || cfg.Server.APIKeys[0] != "test-key" || len(cfg.Server.AdminAPIKeys) != 1 || cfg.Server.AdminAPIKeys[0] != "admin-key" || cfg.Server.RateLimitPerMinute != 60 || cfg.Server.SSEHeartbeatSeconds != 10 {
 		t.Fatalf("server security config not parsed: %+v", cfg.Server)
 	}
+	if cfg.Server.PDFRendererCommand != "chromium" || len(cfg.Server.PDFRendererArgs) != 3 || cfg.Server.PDFRendererTimeout != 45 {
+		t.Fatalf("server pdf renderer config not parsed: %+v", cfg.Server)
+	}
 }
 
 func TestLoadDefaultsServerConfig(t *testing.T) {
@@ -114,6 +120,9 @@ setting:
 	}
 	if cfg.Server.ImageMaxBytes != DefaultImageMaxBytes || len(cfg.Server.ImageAllowedTypes) == 0 {
 		t.Fatalf("image defaults missing: %+v", cfg.Server)
+	}
+	if cfg.Server.PDFRendererTimeout != 30 {
+		t.Fatalf("pdf renderer timeout default missing: %+v", cfg.Server)
 	}
 }
 

@@ -71,3 +71,15 @@ server:
   rate_limit_per_minute: 60
   # 0 uses the default heartbeat interval; negative disables SSE heartbeat.
   sse_heartbeat_seconds: 15
+  # Optional PDF renderer for artifact export. If command is empty, the service
+  # tries common Chrome/Chromium binaries. {{input}} is a file:// URL and
+  # {{output}} is the target PDF path.
+  pdf_renderer_command: "chromium"
+  pdf_renderer_args:
+    - "--headless"
+    - "--disable-gpu"
+    - "--no-sandbox"
+    - "--no-pdf-header-footer"
+    - "--print-to-pdf={{output}}"
+    - "{{input}}"
+  pdf_renderer_timeout_seconds: 30

@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
 
+	"deepAgent/conf"
 	"deepAgent/internal/store"
 )
 
@@ -37,12 +39,53 @@ func TestRenderArtifactHTML(t *testing.T) {
 }
 
 func TestArtifactExportFilename(t *testing.T) {
-	got := artifactExportFilename(store.ArtifactRecord{ID: 7, Title: "Report: A/B Test?"})
+	got := artifactExportFilename(store.ArtifactRecord{ID: 7, Title: "Report: A/B Test?"}, "html")
 	if got != "Report-A-B-Test.html" {
 		t.Fatalf("filename=%q", got)
 	}
-	got = artifactExportFilename(store.ArtifactRecord{ID: 8, Title: "中文报告"})
-	if got != "artifact-8.html" {
+	got = artifactExportFilename(store.ArtifactRecord{ID: 8, Title: "中文报告"}, "pdf")
+	if got != "artifact-8.pdf" {
 		t.Fatalf("filename=%q", got)
+	}
+}
+
+func TestRenderArtifactPDFWithConfiguredRenderer(t *testing.T) {
+	previous := conf.App
+	conf.App = &conf.Config{Server: conf.ServerConfig{
+		PDFRendererCommand: "/bin/sh",
+		PDFRendererArgs: []string{
+			"-c",
+			"printf '%s' '%PDF-1.4 fake' > \"$1\"",
+			"renderer",
+			"{{output}}",
+		},
+		PDFRendererTimeout: 5,
+	}}
+	t.Cleanup(func() { conf.App = previous })
+
+	doc, err := RenderArtifactPDF(context.Background(), store.ArtifactRecord{
+		ID:      9,
+		Kind:    store.ArtifactKindReport,
+		Title:   "中文报告",
+		Content: "# 标题\n\n支持中文 PDF",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(doc), "%PDF-1.4") {
+		t.Fatalf("pdf=%q, want PDF header", doc)
+	}
+}
+
+func TestRenderPDFArgs(t *testing.T) {
+	args := renderPDFArgs([]string{"--print-to-pdf={{output}}", "{{input}}", "{{input_path}}"}, "/tmp/a b.html", "/tmp/out.pdf")
+	if args[0] != "--print-to-pdf=/tmp/out.pdf" {
+		t.Fatalf("output arg=%q", args[0])
+	}
+	if args[1] != "file:///tmp/a%20b.html" {
+		t.Fatalf("input url=%q", args[1])
+	}
+	if args[2] != "/tmp/a b.html" {
+		t.Fatalf("input path=%q", args[2])
 	}
 }

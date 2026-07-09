@@ -2,16 +2,23 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 
+	"deepAgent/conf"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/store"
 )
@@ -27,7 +34,7 @@ func ExportArtifact(w http.ResponseWriter, r *http.Request) {
 	if format == "" {
 		format = "html"
 	}
-	if format != "html" {
+	if format != "html" && format != "pdf" {
 		http.Error(w, "unsupported artifact export format", http.StatusBadRequest)
 		return
 	}
@@ -45,15 +52,32 @@ func ExportArtifact(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "artifact not found", http.StatusNotFound)
 		return
 	}
-	doc, err := RenderArtifactHTML(record)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	switch format {
+	case "html":
+		doc, err := RenderArtifactHTML(record)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		filename := artifactExportFilename(record, "html")
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+		_, _ = w.Write([]byte(doc))
+	case "pdf":
+		doc, err := RenderArtifactPDF(r.Context(), record)
+		if err != nil {
+			status := http.StatusInternalServerError
+			if strings.Contains(err.Error(), "pdf renderer") {
+				status = http.StatusServiceUnavailable
+			}
+			http.Error(w, err.Error(), status)
+			return
+		}
+		filename := artifactExportFilename(record, "pdf")
+		w.Header().Set("Content-Type", "application/pdf")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+		_, _ = w.Write(doc)
 	}
-	filename := artifactExportFilename(record)
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
-	_, _ = w.Write([]byte(doc))
 }
 
 func RenderArtifactHTML(record store.ArtifactRecord) (string, error) {
@@ -81,6 +105,106 @@ func RenderArtifactHTML(record store.ArtifactRecord) (string, error) {
 		return "", fmt.Errorf("render artifact html: %w", err)
 	}
 	return out.String(), nil
+}
+
+func RenderArtifactPDF(ctx context.Context, record store.ArtifactRecord) ([]byte, error) {
+	htmlDoc, err := RenderArtifactHTML(record)
+	if err != nil {
+		return nil, err
+	}
+	dir, err := os.MkdirTemp("", "deepagent-artifact-export-*")
+	if err != nil {
+		return nil, fmt.Errorf("create pdf temp dir: %w", err)
+	}
+	defer os.RemoveAll(dir)
+
+	inputPath := filepath.Join(dir, "artifact.html")
+	outputPath := filepath.Join(dir, "artifact.pdf")
+	if err := os.WriteFile(inputPath, []byte(htmlDoc), 0o600); err != nil {
+		return nil, fmt.Errorf("write pdf html: %w", err)
+	}
+	command, args, err := pdfRendererCommand(inputPath, outputPath)
+	if err != nil {
+		return nil, err
+	}
+	timeout := 30 * time.Second
+	if conf.App != nil {
+		timeout = conf.App.Server.PDFRendererTimeoutDuration()
+	}
+	runCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	cmd := exec.CommandContext(runCtx, command, args...)
+	output, err := cmd.CombinedOutput()
+	if runCtx.Err() == context.DeadlineExceeded {
+		return nil, fmt.Errorf("pdf renderer timed out after %s", timeout)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("pdf renderer failed: %w: %s", err, trimRendererOutput(string(output)))
+	}
+	pdf, err := os.ReadFile(outputPath)
+	if err != nil {
+		return nil, fmt.Errorf("read rendered pdf: %w", err)
+	}
+	if !bytes.HasPrefix(pdf, []byte("%PDF")) {
+		return nil, fmt.Errorf("pdf renderer produced invalid pdf")
+	}
+	return pdf, nil
+}
+
+func pdfRendererCommand(inputPath, outputPath string) (string, []string, error) {
+	if conf.App != nil && strings.TrimSpace(conf.App.Server.PDFRendererCommand) != "" {
+		command := strings.TrimSpace(conf.App.Server.PDFRendererCommand)
+		args := conf.App.Server.PDFRendererArgs
+		if len(args) == 0 {
+			args = defaultPDFRendererArgs()
+		}
+		return command, renderPDFArgs(args, inputPath, outputPath), nil
+	}
+	for _, candidate := range []string{"chromium", "chromium-browser", "google-chrome", "chrome", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"} {
+		if path, err := exec.LookPath(candidate); err == nil {
+			return path, renderPDFArgs(defaultPDFRendererArgs(), inputPath, outputPath), nil
+		}
+	}
+	return "", nil, fmt.Errorf("pdf renderer command not configured or found")
+}
+
+func defaultPDFRendererArgs() []string {
+	return []string{
+		"--headless",
+		"--disable-gpu",
+		"--no-sandbox",
+		"--no-pdf-header-footer",
+		"--print-to-pdf={{output}}",
+		"{{input}}",
+	}
+}
+
+func renderPDFArgs(args []string, inputPath, outputPath string) []string {
+	replacements := map[string]string{
+		"{{input}}":      fileURL(inputPath),
+		"{{input_path}}": inputPath,
+		"{{output}}":     outputPath,
+	}
+	out := make([]string, len(args))
+	for i, arg := range args {
+		for key, value := range replacements {
+			arg = strings.ReplaceAll(arg, key, value)
+		}
+		out[i] = arg
+	}
+	return out
+}
+
+func fileURL(path string) string {
+	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String()
+}
+
+func trimRendererOutput(output string) string {
+	output = strings.TrimSpace(output)
+	if len(output) > 1200 {
+		return output[:1200] + "...[truncated]"
+	}
+	return output
 }
 
 var artifactHTMLTemplate = template.Must(template.New("artifact-html").Parse(`<!doctype html>
@@ -127,7 +251,11 @@ var artifactHTMLTemplate = template.Must(template.New("artifact-html").Parse(`<!
 
 var filenameUnsafe = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)
 
-func artifactExportFilename(record store.ArtifactRecord) string {
+func artifactExportFilename(record store.ArtifactRecord, ext string) string {
+	return artifactExportBaseName(record) + "." + ext
+}
+
+func artifactExportBaseName(record store.ArtifactRecord) string {
 	name := strings.TrimSpace(record.Title)
 	if name == "" {
 		name = fmt.Sprintf("artifact-%d", record.ID)
@@ -140,5 +268,5 @@ func artifactExportFilename(record store.ArtifactRecord) string {
 	if len(name) > 80 {
 		name = name[:80]
 	}
-	return name + ".html"
+	return name
 }
