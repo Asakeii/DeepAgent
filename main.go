@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -19,11 +18,13 @@ import (
 	"deepAgent/conf"
 	"deepAgent/internal/agent"
 	"deepAgent/internal/app"
+	"deepAgent/internal/auth"
 	"deepAgent/internal/handler"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
 	"deepAgent/internal/observability"
 	"deepAgent/internal/scheduler"
+	"deepAgent/internal/store"
 	"deepAgent/internal/tool"
 )
 
@@ -182,6 +183,10 @@ func runCheckin(cfg *conf.Config) {
 }
 
 func runServer() {
+	authenticator, err := auth.NewAuthenticator(context.Background(), conf.App.Server)
+	if err != nil {
+		log.Fatal(err)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/chat/stream", handler.ChatStreamEino)
 	mux.HandleFunc("/wechat/callback", handler.WechatCallback)
@@ -208,6 +213,7 @@ func runServer() {
 	mux.HandleFunc("/api/artifact-shares", handler.ArtifactShares)
 	mux.HandleFunc("/api/artifact-citations", handler.ListArtifactCitations)
 	mux.HandleFunc("/api/settings", handler.UserSettings)
+	mux.HandleFunc("/api/me", handler.Me)
 	mux.HandleFunc("/api/reminders", handler.ListReminders)
 	mux.HandleFunc("/api/reminders/cancel", handler.CancelReminder)
 	mux.HandleFunc("/api/reminders/toggle", handler.ToggleReminder)
@@ -215,12 +221,22 @@ func runServer() {
 
 	addr := ":8741"
 	log.Printf("deepAgent server listening on %s", addr)
-	if err := http.ListenAndServe(addr, withHTTPGuards(mux)); err != nil {
+	if err := http.ListenAndServe(addr, withHTTPGuardsAndAuthenticator(mux, authenticator)); err != nil {
 		log.Fatal(err)
 	}
 }
 
 func withHTTPGuards(next http.Handler) http.Handler {
+	authenticator, err := auth.NewAuthenticatorWithVerifier(conf.App.Server, nil)
+	if err != nil {
+		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "authentication configuration invalid", http.StatusInternalServerError)
+		})
+	}
+	return withHTTPGuardsAndAuthenticator(next, authenticator)
+}
+
+func withHTTPGuardsAndAuthenticator(next http.Handler, authenticator *auth.Authenticator) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !applyCORS(w, r) {
 			http.Error(w, "origin forbidden", http.StatusForbidden)
@@ -230,13 +246,24 @@ func withHTTPGuards(next http.Handler) http.Handler {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		if requiresAdminProtection(r.URL.Path) && !authorizeAdminRequest(r) {
-			http.Error(w, "admin unauthorized", http.StatusUnauthorized)
-			return
-		}
-		if !requiresAdminProtection(r.URL.Path) && requiresAPIProtection(r.URL.Path) && !authorizeAPIRequest(r) {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
+		if requiresAPIProtection(r.URL.Path) && authenticator != nil && authenticator.Enabled() {
+			principal, err := authenticator.Authenticate(r)
+			if err != nil {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			if requiresAdminProtection(r.URL.Path) && !principal.Admin {
+				http.Error(w, "admin forbidden", http.StatusForbidden)
+				return
+			}
+			if infra.DB != nil {
+				if err := store.EnsureUserProfile(r.Context(), infra.DB, principal.UserID, principal.Provider, principal.ProviderID, principal.DisplayName); err != nil {
+					log.Printf("[auth] provision user=%s: %v", principal.UserID, err)
+					http.Error(w, "identity provisioning failed", http.StatusInternalServerError)
+					return
+				}
+			}
+			r = r.WithContext(auth.WithPrincipal(r.Context(), principal))
 		}
 		if requiresAPIProtection(r.URL.Path) && !allowByRateLimit(w, r) {
 			return
@@ -275,40 +302,6 @@ func requiresAdminProtection(path string) bool {
 	return strings.HasPrefix(path, "/api/admin/")
 }
 
-func authorizeAPIRequest(r *http.Request) bool {
-	keys := conf.App.Server.APIKeys
-	if len(keys) == 0 {
-		return true
-	}
-	got := requestAPIKey(r)
-	if got == "" {
-		return false
-	}
-	for _, key := range keys {
-		if subtle.ConstantTimeCompare([]byte(got), []byte(key)) == 1 {
-			return true
-		}
-	}
-	return false
-}
-
-func authorizeAdminRequest(r *http.Request) bool {
-	keys := conf.App.Server.AdminAPIKeys
-	if len(keys) == 0 {
-		return authorizeAPIRequest(r)
-	}
-	got := requestAPIKey(r)
-	if got == "" {
-		return false
-	}
-	for _, key := range keys {
-		if subtle.ConstantTimeCompare([]byte(got), []byte(key)) == 1 {
-			return true
-		}
-	}
-	return false
-}
-
 func requestAPIKey(r *http.Request) string {
 	if raw := strings.TrimSpace(r.Header.Get("Authorization")); raw != "" {
 		const prefix = "Bearer "
@@ -325,6 +318,9 @@ func allowByRateLimit(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 	identity := requestAPIKey(r)
+	if principal, ok := auth.PrincipalFromContext(r.Context()); ok {
+		identity = principal.UserID
+	}
 	if identity == "" {
 		identity = clientIP(r)
 	}

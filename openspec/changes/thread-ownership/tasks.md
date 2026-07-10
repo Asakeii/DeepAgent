@@ -7,5 +7,5 @@
 - [x] Filter sessions by user.
 - [x] Protect message, reminder, and run-event endpoints.
 - [x] Add focused ownership tests.
-- [ ] Replace lightweight user resolution with real auth middleware.
+- [x] Replace lightweight user resolution with stateless OIDC/JWKS and named API-key principals.
 - [ ] Add migration/adoption strategy for pre-ownership historical threads.

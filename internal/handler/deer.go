@@ -6,6 +6,7 @@ import (
 
 	"deepAgent/conf"
 	"deepAgent/internal/app"
+	"deepAgent/internal/auth"
 	"deepAgent/internal/infra"
 	"deepAgent/internal/model"
 )
@@ -16,7 +17,6 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	sse := infra.NewSSEWriter(w)
 	if conf.App != nil {
 		stopHeartbeat := sse.StartHeartbeat(ctx, conf.App.Server.SSEHeartbeatInterval())
@@ -28,7 +28,7 @@ func ChatStreamEino(w http.ResponseWriter, r *http.Request) {
 		_ = sse.WriteEvent("error", &model.ChatResp{Role: "assistant", Content: "invalid request body: " + err.Error()})
 		return
 	}
-	if req.UserID == "" {
+	if _, authenticated := auth.PrincipalFromContext(r.Context()); authenticated || req.UserID == "" {
 		req.UserID = requestUserID(r)
 	}
 	app.NewChatService().RunStream(ctx, req, sse)

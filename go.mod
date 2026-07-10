@@ -6,6 +6,7 @@ require (
 	github.com/cloudwego/eino v0.9.7
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.17
+	github.com/coreos/go-oidc/v3 v3.19.0
 	github.com/eino-contrib/jsonschema v1.0.3
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/mark3labs/mcp-go v0.54.1
@@ -18,7 +19,9 @@ require (
 require (
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 )
 
 require (

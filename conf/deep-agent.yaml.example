@@ -73,9 +73,27 @@ server:
   url_allow_private_networks: false
   # Empty api_keys disables API-key auth for local development.
   # Configure one or more keys in production and pass Authorization: Bearer <key>.
+  # Legacy keys map to deterministic service principals and cannot impersonate
+  # X-DeepAgent-User. Prefer api_key_principals for named machine callers.
   api_keys: []
   # Admin APIs require one of these keys when configured. Do not reuse normal user API keys.
   admin_api_keys: []
+  api_key_principals:
+    # - key: "<inject from your secret manager>"
+    #   user_id: "service:automation"
+    #   display_name: "Automation worker"
+    #   admin: false
+  # Optional OIDC resource-server validation. Configuring issuer_url and audience
+  # enables authentication for all protected routes. Tokens are validated with
+  # provider discovery, cached JWKS, issuer, audience, signature, and expiry checks.
+  oidc:
+    issuer_url: ""
+    audience: ""
+    user_id_claim: "sub"
+    display_name_claim: "name"
+    roles_claim: "groups"
+    admin_roles: ["deepagent-admin"]
+    discovery_timeout_seconds: 10
   # Requires Redis to be initialized; 0 disables rate limiting.
   rate_limit_per_minute: 60
   # 0 uses the default heartbeat interval; negative disables SSE heartbeat.

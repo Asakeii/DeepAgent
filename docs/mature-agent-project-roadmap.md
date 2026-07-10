@@ -38,22 +38,18 @@
 
 ### 3.1 用户与权限体系
 
-当前问题：
+当前进展：
 
-- 主要以 `thread_id` 作为会话身份。
-- `/api/messages?thread_id=...`、`/api/reminders?thread_id=...` 这类接口缺少用户所有权校验。
-- CORS 仍偏开发态。
-- WeChat 用户、Web 用户、OpenAI-compatible 调用方之间没有统一身份模型。
+- 已有 `users`、`threads` 与 team membership，共享 MySQL 中保存 ownership，Pod 间判定一致。
+- Web/API 已支持无状态 OIDC/JWKS Bearer JWT；机器调用支持具名 API key principal，WeChat 使用签名回调和 openid 身份。
+- thread/message/reminder/run/artifact 等读写入口已按可信主体或团队成员关系校验。
+- 已有 CORS 白名单、Redis 多 Pod 共享限流和管理员角色边界。
 
-需要补：
+仍需补：
 
-- `users` 表。
-- `sessions / threads` 表，绑定 `user_id`。
-- API 鉴权 middleware。
-- Web session / API key / WeChat openid 映射。
-- 所有 thread/message/reminder/checkin 查询都加 user ownership check。
-- CORS 白名单。
-- rate limit。
+- 前端 Authorization Code + PKCE 登录、token 刷新与退出体验。
+- 生产环境禁止空认证配置的启动门禁，以及 Secret Manager/Kubernetes Secret 集成。
+- 历史无 ownership 数据的迁移/认领策略。
 
 建议优先级：P0。
 
@@ -490,6 +486,7 @@ AppendMessage:
 - [x] SSE heartbeat。
 - [x] 消息写入并发修复。
 - [x] 结构化日志和 run_id。
+- [x] 无状态 OIDC/JWKS 认证和可信用户主体（浏览器 PKCE 登录体验待补）。
 
 ## 6. P1 任务清单
 
@@ -522,7 +519,7 @@ AppendMessage:
 
 ```text
 handler
-  -> auth middleware
+  -> stateless OIDC/JWKS auth middleware
   -> request decoder
   -> app service
   -> response encoder

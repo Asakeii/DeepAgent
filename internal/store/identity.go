@@ -56,6 +56,10 @@ func EnsureIdentityTables(ctx context.Context, db *sql.DB) error {
 }
 
 func EnsureUser(ctx context.Context, db *sql.DB, userID, provider, providerID string) error {
+	return EnsureUserProfile(ctx, db, userID, provider, providerID, "")
+}
+
+func EnsureUserProfile(ctx context.Context, db *sql.DB, userID, provider, providerID, displayName string) error {
 	if db == nil {
 		return fmt.Errorf("db is nil")
 	}
@@ -66,11 +70,19 @@ func EnsureUser(ctx context.Context, db *sql.DB, userID, provider, providerID st
 	if providerID == "" {
 		providerID = userID
 	}
+	if len(providerID) > 128 {
+		providerID = providerID[:128]
+	}
+	displayName = strings.TrimSpace(displayName)
+	if len(displayName) > 128 {
+		displayName = displayName[:128]
+	}
 	_, err := db.ExecContext(ctx,
-		`INSERT INTO users (id, provider, provider_id)
-		 VALUES (?, ?, ?)
-		 ON DUPLICATE KEY UPDATE provider=VALUES(provider), provider_id=VALUES(provider_id)`,
-		userID, provider, providerID,
+		`INSERT INTO users (id, provider, provider_id, display_name)
+		 VALUES (?, ?, ?, ?)
+		 ON DUPLICATE KEY UPDATE
+		 display_name=IF(VALUES(display_name)<>'', VALUES(display_name), display_name)`,
+		userID, provider, providerID, displayName,
 	)
 	if err != nil {
 		return fmt.Errorf("ensure user: %w", err)

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"deepAgent/conf"
+	"deepAgent/internal/auth"
 	"deepAgent/internal/infra"
 )
 
@@ -89,6 +90,33 @@ func TestHTTPGuardsRequireAPIKeyForProtectedRoutes(t *testing.T) {
 	}
 }
 
+func TestHTTPGuardsAttachNamedAPIKeyPrincipal(t *testing.T) {
+	withTestServerConfig(t, conf.ServerConfig{
+		AllowedOrigins: []string{"https://app.example.com"},
+		MaxBodyBytes:   1024,
+		APIKeyPrincipals: []conf.APIKeyPrincipalConfig{{
+			Key:    "service-secret",
+			UserID: "service:indexer",
+		}},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	req.Header.Set("Authorization", "Bearer service-secret")
+	req.Header.Set("X-DeepAgent-User", "spoofed-user")
+	rec := httptest.NewRecorder()
+
+	withHTTPGuards(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		principal, ok := auth.PrincipalFromContext(r.Context())
+		if !ok || principal.UserID != "service:indexer" {
+			t.Fatalf("principal=%+v ok=%v", principal, ok)
+		}
+		w.WriteHeader(http.StatusOK)
+	})).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
 func TestHTTPGuardsAllowBearerAPIKey(t *testing.T) {
 	withTestServerConfig(t, conf.ServerConfig{
 		AllowedOrigins: []string{"https://app.example.com"},
@@ -123,8 +151,8 @@ func TestHTTPGuardsRequireAdminAPIKeyForAdminRoutes(t *testing.T) {
 		t.Fatal("handler should not be called")
 	})).ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("status=%d, want %d", rec.Code, http.StatusUnauthorized)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status=%d, want %d", rec.Code, http.StatusForbidden)
 	}
 }
 

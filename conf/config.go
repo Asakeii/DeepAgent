@@ -85,21 +85,44 @@ type SettingConfig struct {
 	RunTimeoutSeconds             int  `yaml:"run_timeout_seconds"`
 }
 
+// OIDCConfig configures stateless bearer-token validation through an OpenID
+// Connect provider. The provider discovery document supplies the JWKS endpoint.
+type OIDCConfig struct {
+	IssuerURL               string   `yaml:"issuer_url"`
+	Audience                string   `yaml:"audience"`
+	UserIDClaim             string   `yaml:"user_id_claim"`
+	DisplayNameClaim        string   `yaml:"display_name_claim"`
+	RolesClaim              string   `yaml:"roles_claim"`
+	AdminRoles              []string `yaml:"admin_roles"`
+	DiscoveryTimeoutSeconds int      `yaml:"discovery_timeout_seconds"`
+}
+
+// APIKeyPrincipalConfig binds a machine credential to one stable service
+// principal. Prefer this over the legacy unscoped api_keys list in production.
+type APIKeyPrincipalConfig struct {
+	Key         string `yaml:"key"`
+	UserID      string `yaml:"user_id"`
+	DisplayName string `yaml:"display_name"`
+	Admin       bool   `yaml:"admin"`
+}
+
 type ServerConfig struct {
-	AllowedOrigins          []string `yaml:"allowed_origins"`
-	MaxBodyBytes            int64    `yaml:"max_body_bytes"`
-	ImageMaxBytes           int64    `yaml:"image_max_bytes"`
-	ImageAllowedTypes       []string `yaml:"image_allowed_types"`
-	URLAllowedHosts         []string `yaml:"url_allowed_hosts"`
-	URLDeniedHosts          []string `yaml:"url_denied_hosts"`
-	URLAllowPrivateNetworks bool     `yaml:"url_allow_private_networks"`
-	APIKeys                 []string `yaml:"api_keys"`
-	AdminAPIKeys            []string `yaml:"admin_api_keys"`
-	RateLimitPerMinute      int      `yaml:"rate_limit_per_minute"`
-	SSEHeartbeatSeconds     int      `yaml:"sse_heartbeat_seconds"`
-	PDFRendererCommand      string   `yaml:"pdf_renderer_command"`
-	PDFRendererArgs         []string `yaml:"pdf_renderer_args"`
-	PDFRendererTimeout      int      `yaml:"pdf_renderer_timeout_seconds"`
+	AllowedOrigins          []string                `yaml:"allowed_origins"`
+	MaxBodyBytes            int64                   `yaml:"max_body_bytes"`
+	ImageMaxBytes           int64                   `yaml:"image_max_bytes"`
+	ImageAllowedTypes       []string                `yaml:"image_allowed_types"`
+	URLAllowedHosts         []string                `yaml:"url_allowed_hosts"`
+	URLDeniedHosts          []string                `yaml:"url_denied_hosts"`
+	URLAllowPrivateNetworks bool                    `yaml:"url_allow_private_networks"`
+	APIKeys                 []string                `yaml:"api_keys"`
+	AdminAPIKeys            []string                `yaml:"admin_api_keys"`
+	APIKeyPrincipals        []APIKeyPrincipalConfig `yaml:"api_key_principals"`
+	OIDC                    OIDCConfig              `yaml:"oidc"`
+	RateLimitPerMinute      int                     `yaml:"rate_limit_per_minute"`
+	SSEHeartbeatSeconds     int                     `yaml:"sse_heartbeat_seconds"`
+	PDFRendererCommand      string                  `yaml:"pdf_renderer_command"`
+	PDFRendererArgs         []string                `yaml:"pdf_renderer_args"`
+	PDFRendererTimeout      int                     `yaml:"pdf_renderer_timeout_seconds"`
 }
 
 var App *Config // 全局配置变量，保存加载后的配置
@@ -152,6 +175,18 @@ func Load(ctx context.Context) (*Config, error) {
 	}
 	if cfg.Server.PDFRendererTimeout <= 0 {
 		cfg.Server.PDFRendererTimeout = 30
+	}
+	if cfg.Server.OIDC.UserIDClaim == "" {
+		cfg.Server.OIDC.UserIDClaim = "sub"
+	}
+	if cfg.Server.OIDC.DisplayNameClaim == "" {
+		cfg.Server.OIDC.DisplayNameClaim = "name"
+	}
+	if cfg.Server.OIDC.RolesClaim == "" {
+		cfg.Server.OIDC.RolesClaim = "groups"
+	}
+	if cfg.Server.OIDC.DiscoveryTimeoutSeconds <= 0 {
+		cfg.Server.OIDC.DiscoveryTimeoutSeconds = 10
 	}
 
 	App = &cfg // 保存到全局变量

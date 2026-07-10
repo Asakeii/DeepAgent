@@ -45,6 +45,19 @@ server:
   url_allow_private_networks: true
   api_keys: ["test-key"]
   admin_api_keys: ["admin-key"]
+  api_key_principals:
+    - key: "worker-key"
+      user_id: "service:worker"
+      display_name: "Worker"
+      admin: false
+  oidc:
+    issuer_url: "https://issuer.example.com"
+    audience: "deepagent-api"
+    user_id_claim: "sub"
+    display_name_claim: "preferred_username"
+    roles_claim: "roles"
+    admin_roles: ["deepagent-admin"]
+    discovery_timeout_seconds: 8
   rate_limit_per_minute: 60
   sse_heartbeat_seconds: 10
   pdf_renderer_command: "chromium"
@@ -92,6 +105,12 @@ server:
 	if len(cfg.Server.APIKeys) != 1 || cfg.Server.APIKeys[0] != "test-key" || len(cfg.Server.AdminAPIKeys) != 1 || cfg.Server.AdminAPIKeys[0] != "admin-key" || cfg.Server.RateLimitPerMinute != 60 || cfg.Server.SSEHeartbeatSeconds != 10 {
 		t.Fatalf("server security config not parsed: %+v", cfg.Server)
 	}
+	if len(cfg.Server.APIKeyPrincipals) != 1 || cfg.Server.APIKeyPrincipals[0].UserID != "service:worker" || cfg.Server.APIKeyPrincipals[0].DisplayName != "Worker" {
+		t.Fatalf("api key principals not parsed: %+v", cfg.Server.APIKeyPrincipals)
+	}
+	if cfg.Server.OIDC.IssuerURL != "https://issuer.example.com" || cfg.Server.OIDC.Audience != "deepagent-api" || cfg.Server.OIDC.RolesClaim != "roles" || len(cfg.Server.OIDC.AdminRoles) != 1 || cfg.Server.OIDC.DiscoveryTimeoutSeconds != 8 {
+		t.Fatalf("oidc config not parsed: %+v", cfg.Server.OIDC)
+	}
 	if cfg.Server.PDFRendererCommand != "chromium" || len(cfg.Server.PDFRendererArgs) != 3 || cfg.Server.PDFRendererTimeout != 45 {
 		t.Fatalf("server pdf renderer config not parsed: %+v", cfg.Server)
 	}
@@ -132,6 +151,9 @@ setting:
 	}
 	if cfg.Server.PDFRendererTimeout != 30 {
 		t.Fatalf("pdf renderer timeout default missing: %+v", cfg.Server)
+	}
+	if cfg.Server.OIDC.UserIDClaim != "sub" || cfg.Server.OIDC.DisplayNameClaim != "name" || cfg.Server.OIDC.RolesClaim != "groups" || cfg.Server.OIDC.DiscoveryTimeoutSeconds != 10 {
+		t.Fatalf("oidc defaults missing: %+v", cfg.Server.OIDC)
 	}
 }
 
